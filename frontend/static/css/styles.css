@@ -1,0 +1,158 @@
+:root {
+    --primary-color: #007bff;
+    --primary-hover: #0056b3;
+    --background-color: #ffffff;
+    --text-color: #333333;
+    --border-color: #dddddd;
+}
+
+/* Dark theme */
+.dark {
+    --background-color: #1a1a1a;
+    --text-color: #ffffff;
+    --border-color: #404040;
+}
+
+body {
+    background-color: var(--background-color);
+    color: var(--text-color);
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+    transition: background-color 0.3s;
+}
+
+.container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px;
+    position: relative;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+}
+
+input[type="text"],
+input[type="password"],
+select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: var(--background-color);
+    color: var(--text-color);
+}
+
+button {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+button:hover {
+    background-color: var(--primary-hover);
+}
+
+.theme-toggle {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    padding: 8px;
+    font-size: 20px;
+    background: none;
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+}
+
+/* Radio buttons styling */
+input[type="radio"] {
+    margin-right: 8px;
+}
+
+.radio-group label {
+    display: inline-block;
+    margin-right: 20px;
+}
+
+option[selected] {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.success-message {
+    padding: 10px;
+    margin-top: 20px;
+    border-radius: 4px;
+    text-align: center;
+}
+
+.success-message:empty {
+    display: none;
+}
+
+/* Status messages styling */
+.success-message {
+    padding: 10px;
+    margin-top: 20px;
+    border-radius: 4px;
+    text-align: center;
+}
+
+/* Different types of status messages */
+.success-message[x-text*="✅"] {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.success-message[x-text*="❌"] {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.success-message[x-text*="⏳"] {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeeba;
+}
+
+/* Hover effects for interactive elements */
+select:hover,
+input[type="text"]:hover,
+input[type="password"]:hover {
+    border-color: var(--primary-color);
+}
+
+select:focus,
+input[type="text"]:focus,
+input[type="password"]:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+/* Dark theme specific adjustments */
+.dark button {
+    background-color: var(--primary-color);
+}
+
+.dark .theme-toggle {
+    color: var(--text-color);
+}
+
+.dark select option {
+    background-color: var(--background-color);
+    color: var(--text-color);
+}

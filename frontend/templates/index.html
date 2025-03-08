@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GrafikPlus</title>
+    <link rel="icon" href="/static/img/favicon.ico">
+
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <!-- Main JS -->
+    <script src="/static/js/main.js"></script>
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body x-data="themeHandler" :class="theme">
+
+<div class="container" x-data="scheduleForm" x-init="generateWeeks">
+    <h1>GrafikPlus</h1>
+
+    <!-- Theme Toggle -->
+    <button @click="toggleTheme()" class="theme-toggle">🌓</button>
+
+    <form @submit.prevent="submitForm">
+        <!-- Login -->
+        <div class="form-group">
+            <label for="username">Login:</label>
+            <input type="text" id="username" x-model="username" required>
+        </div>
+
+        <!-- Password -->
+        <div class="form-group">
+            <label for="password">Hasło:</label>
+            <input type="password" id="password" x-model="password" required>
+        </div>
+
+        <!-- Select Week Range -->
+        <div class="form-group">
+            <label for="startWeek">Tydzień początkowy:</label>
+            <select id="startWeek" x-model="startWeek">
+                <template x-for="week in weeks" :key="week.value">
+                    <option :value="week.value" x-text="week.label"></option>
+                </template>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="endWeek">Tydzień końcowy:</label>
+            <select id="endWeek" x-model="endWeek">
+                <template x-for="week in weeks" :key="week.value">
+                    <option :value="week.value" x-text="week.label"></option>
+                </template>
+            </select>
+        </div>
+
+        <!-- Schedule Type -->
+        <div class="form-group radio-group">
+            <label>Wybierz grafik:</label>
+            <label>
+                <input type="radio" name="scheduleType" value="personal" x-model="scheduleType">
+                Grafik użytkownika
+            </label>
+            <label>
+                <input type="radio" name="scheduleType" value="installation" x-model="scheduleType">
+                Grafik montaży
+            </label>
+        </div>
+
+        <!-- File Name -->
+        <div class="form-group">
+            <label for="filename">Nazwa pliku:</label>
+            <input type="text" id="filename" x-model="filename" placeholder="grafik.xlsx" required>
+        </div>
+
+        <!-- Download Button -->
+        <button type="submit">Pobierz grafik</button>
+    </form>
+
+    <p x-show="message" x-text="message" class="success-message"></p>
+</div>
+</body>
+</html>
