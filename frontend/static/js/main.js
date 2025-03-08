@@ -25,16 +25,15 @@ document.addEventListener('alpine:init', () => {
             // Set max date to end of current year
             this.maxDate = `${year}-12-31`;
 
-            // Set default dates to current week
+            // Set default dates to monday of the current week
             const currentDay = today.getDay();
             const monday = new Date(today);
             monday.setDate(today.getDate() - currentDay + 1);
 
-            const sunday = new Date(monday);
-            sunday.setDate(monday.getDate() + 6);
+            const currentWeekMonday = monday.toISOString().split('T')[0];
 
-            this.startDate = monday.toISOString().split('T')[0];
-            this.endDate = sunday.toISOString().split('T')[0];
+            this.startDate = currentWeekMonday;
+            this.endDate = currentWeekMonday;
         },
 
         /**
