@@ -17,7 +17,7 @@
 </head>
 <body x-data="themeHandler" :class="theme">
 
-<div class="container" x-data="scheduleForm" x-init="generateWeeks">
+<div class="container" x-data="scheduleForm" x-init="initializeDates">
     <h1>GrafikPlus</h1>
 
     <!-- Theme Toggle -->
@@ -36,23 +36,25 @@
             <input type="password" id="password" x-model="password" required>
         </div>
 
-        <!-- Select Week Range -->
+        <!-- Date Range -->
         <div class="form-group">
-            <label for="startWeek">Tydzień początkowy:</label>
-            <select id="startWeek" x-model="startWeek">
-                <template x-for="week in weeks" :key="week.value">
-                    <option :value="week.value" x-text="week.label"></option>
-                </template>
-            </select>
+            <label for="startDate">Data początkowa:</label>
+            <input type="date"
+                   id="startDate"
+                   x-model="startDate"
+                   :min="minDate"
+                   :max="maxDate"
+                   required>
         </div>
 
         <div class="form-group">
-            <label for="endWeek">Tydzień końcowy:</label>
-            <select id="endWeek" x-model="endWeek">
-                <template x-for="week in weeks" :key="week.value">
-                    <option :value="week.value" x-text="week.label"></option>
-                </template>
-            </select>
+            <label for="endDate">Data końcowa:</label>
+            <input type="date"
+                   id="endDate"
+                   x-model="endDate"
+                   :min="startDate"
+                   :max="maxDate"
+                   required>
         </div>
 
         <!-- Schedule Type -->

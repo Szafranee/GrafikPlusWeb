@@ -156,3 +156,36 @@ input[type="password"]:focus {
     background-color: var(--background-color);
     color: var(--text-color);
 }
+
+/* Date inputs styling */
+input[type="date"] {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    font-family: inherit;
+    font-size: 16px;
+}
+
+/* Calendar icon color fix for dark mode */
+.dark input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+}
+
+/* Hover and focus states */
+input[type="date"]:hover {
+    border-color: var(--primary-color);
+}
+
+input[type="date"]:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+/* Invalid state */
+input[type="date"]:invalid {
+    border-color: #dc3545;
+}
