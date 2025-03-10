@@ -15,6 +15,15 @@ def create_app():
     # Enable CORS
     CORS(app)
 
+    # Production settings
+    app.config.update(
+        ENV='production',
+        DEBUG=False,
+        TESTING=False,
+        SECRET_KEY=os.environ.get('SECRET_KEY', 'dev-key-change-in-production'),
+        PREFERRED_URL_SCHEME='https'
+    )
+
     # Basic configuration
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-key-change-in-production')
 
