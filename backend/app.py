@@ -1,4 +1,3 @@
-# backend/app.py
 from flask import Flask, render_template
 from flask_cors import CORS
 from backend.api.routes import api_blueprint
