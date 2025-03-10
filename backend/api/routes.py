@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, send_file
+from flask import Blueprint, request, jsonify, send_file, current_app
 from backend.config import ScheduleConfig
 from backend.schedule_scraper import ScheduleScraper
 import tempfile
@@ -6,6 +6,11 @@ import os
 import shutil
 
 api_blueprint = Blueprint('api', __name__)
+
+@api_blueprint.route('/health', methods=['GET'])
+def health_check():
+    """Test endpoint to check if API is working"""
+    return jsonify({"status": "ok"})
 
 @api_blueprint.route('/schedule', methods=['POST'])
 def get_schedule():
@@ -83,6 +88,7 @@ def get_schedule():
 
     except Exception as e:
         # Handle unexpected errors
+        current_app.logger.error(f"Unexpected error: {str(e)}")
         return jsonify({
             "title": "Nieoczekiwany błąd",
             "message": str(e)
@@ -94,4 +100,4 @@ def get_schedule():
             try:
                 shutil.rmtree(temp_dir, ignore_errors=True)
             except Exception as e:
-                print(f"Failed to remove temporary directory: {e}")
+                current_app.logger.error(f"Failed to remove temporary directory: {e}")

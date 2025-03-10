@@ -1,31 +1,22 @@
-// Initialize Alpine.js components when the framework is ready
 document.addEventListener('alpine:init', () => {
-    // Main form handling component
     Alpine.data('scheduleForm', () => ({
-        // Form state variables
         username: '',
         password: '',
-        startWeek: '',
-        endWeek: '',
-        scheduleType: 'personal',  // Default to personal schedule
-        filename: 'grafik.xlsx',   // Default filename
-        message: '',               // Status message
-        weeks: [],                 // Available weeks array
+        startDate: '',
+        endDate: '',
+        scheduleType: 'personal',
+        filename: 'grafik.xlsx',
+        message: '',
+        minDate: '',
+        maxDate: '',
 
-        /**
-         * Initialize date inputs with current week
-         */
         initializeDates() {
             const today = new Date();
             const year = today.getFullYear();
 
-            // Set min date to start of current year
             this.minDate = `${year}-01-01`;
-
-            // Set max date to end of current year
             this.maxDate = `${year}-12-31`;
 
-            // Set default dates to monday of the current week
             const currentDay = today.getDay();
             const monday = new Date(today);
             monday.setDate(today.getDate() - currentDay + 1);
@@ -36,9 +27,6 @@ document.addEventListener('alpine:init', () => {
             this.endDate = currentWeekMonday;
         },
 
-        /**
-         * Handle form submission
-         */
         async submitForm() {
             try {
                 const formData = {
@@ -51,7 +39,8 @@ document.addEventListener('alpine:init', () => {
 
                 this.message = '⏳ Pobieranie grafiku...';
 
-                const response = await fetch('http://localhost:5000/api/schedule', {
+                // Use relative URL for API
+                const response = await fetch('/api/schedule', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -65,7 +54,6 @@ document.addEventListener('alpine:init', () => {
                 }
 
                 const blob = await response.blob();
-
                 const downloadUrl = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = downloadUrl;
@@ -86,16 +74,10 @@ document.addEventListener('alpine:init', () => {
         }
     }));
 
-    // Theme handling component
     Alpine.data('themeHandler', () => ({
-        // Get theme from localStorage or system preferences
         theme: localStorage.getItem('theme') ||
             (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'),
 
-        /**
-         * Toggles between light and dark theme
-         * Persists selection to localStorage
-         */
         toggleTheme() {
             this.theme = this.theme === 'light' ? 'dark' : 'light';
             localStorage.setItem('theme', this.theme);
