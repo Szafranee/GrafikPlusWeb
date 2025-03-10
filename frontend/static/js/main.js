@@ -27,6 +27,17 @@ document.addEventListener('alpine:init', () => {
             this.endDate = currentWeekMonday;
         },
 
+        scrollToMessage() {
+            // Wait for the DOM to update before scrolling
+            this.$nextTick(() => {
+                const messageElement = document.querySelector('.success-message');
+                if (messageElement) {
+                    const y = messageElement.getBoundingClientRect().top + window.pageYOffset;
+                    window.scrollTo({top: y, behavior: 'smooth'});
+                }
+            });
+        },
+
         async submitForm() {
             try {
                 const formData = {
@@ -38,8 +49,8 @@ document.addEventListener('alpine:init', () => {
                 };
 
                 this.message = '⏳ Pobieranie grafiku...';
+                this.scrollToMessage();
 
-                // Use relative URL for API
                 const response = await fetch('/api/schedule', {
                     method: 'POST',
                     headers: {
@@ -64,12 +75,20 @@ document.addEventListener('alpine:init', () => {
                 window.URL.revokeObjectURL(downloadUrl);
 
                 this.message = '✅ Grafik został pobrany!';
-                setTimeout(() => this.message = '', 3000);
+                this.scrollToMessage();
+
+                setTimeout(() => {
+                    this.message = '';
+                }, 4000);
 
             } catch (error) {
                 console.error('Error:', error);
                 this.message = `❌ ${error.message}`;
-                setTimeout(() => this.message = '', 5000);
+                this.scrollToMessage();
+
+                setTimeout(() => {
+                    this.message = '';
+                }, 5000);
             }
         }
     }));
