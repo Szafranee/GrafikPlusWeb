@@ -1,6 +1,6 @@
 document.addEventListener('alpine:init', () => {
     Alpine.data('scheduleForm', () => ({
-        username: '',
+        username: localStorage.getItem('lastUsername') || '',
         password: '',
         startDate: '',
         endDate: '',
@@ -40,6 +40,9 @@ document.addEventListener('alpine:init', () => {
 
         async submitForm() {
             try {
+                // Save username to localStorage
+                localStorage.setItem('lastUsername', this.username);
+                
                 const formData = {
                     username: this.username,
                     password: this.password,
