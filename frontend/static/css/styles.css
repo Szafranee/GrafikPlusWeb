@@ -60,7 +60,7 @@ h1 {
     border-radius: 10px;
     box-shadow: var(--card-shadow);
     position: relative;
-    padding: 15px 30px 30px;
+    padding: 10px 30px 20px;
 }
 
 /* Section styles */
@@ -68,14 +68,14 @@ h1 {
     background-color: var(--background-color);
     border: 1px solid var(--border-color);
     border-radius: 8px;
-    padding: 20px;
-    margin-bottom: 15px;
+    padding: 15px;
+    margin-bottom: 10px;
 }
 
 .section-header {
     font-size: 16px;
     font-weight: bold;
-    margin-bottom: 15px;
+    margin-bottom: 10px;
     color: var(--text-color);
     text-align: center;
     text-transform: uppercase;
@@ -84,7 +84,7 @@ h1 {
 
 /* Form group */
 .form-group {
-    margin-bottom: 20px;
+    margin-bottom: 15px;
 }
 
 label {
@@ -99,7 +99,7 @@ input[type="text"],
 input[type="password"],
 input[type="date"] {
     width: 100%;
-    padding: 14px;
+    padding: 10px;
     border: 2px solid var(--border-color);
     border-radius: 8px;
     background-color: var(--background-color);
@@ -217,7 +217,7 @@ input[type="date"] {
 /* Submit button */
 button[type="submit"] {
     width: 100%;
-    padding: 14px;
+    padding: 10px;
     background: linear-gradient(45deg, var(--primary-color), var(--primary-hover));
     color: white;
     border: none;
