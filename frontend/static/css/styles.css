@@ -22,7 +22,7 @@
 
 /* Light theme background */
 body {
-    background: linear-gradient(180deg, #f3f4f6, #85b4ff);
+    background: linear-gradient(180deg, #f3f4f6, #2878ff);
     background-size: 200% 200%;
     color: var(--text-color);
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
