@@ -12,6 +12,14 @@
     --transition-speed: 0.3s;
 }
 
+/* Ensure full height for html and body */
+html, body {
+    height: 100vh;
+    margin: 0;
+    overflow: hidden;
+}
+
+
 /* Dark theme variables */
 .dark {
     --background-color: #1a1a1a;
@@ -20,15 +28,16 @@
     --card-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-/* Light theme background */
 body {
-    background: linear-gradient(180deg, #f3f4f6, #2878ff);
-    background-size: 200% 200%;
+    background-size: 100% 120%;
+    background: linear-gradient(180deg, #f3f4f6, #2878ff) no-repeat fixed;
     color: var(--text-color);
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    margin: 0;
     padding: 20px;
     transition: background 0.5s ease-in-out, color 0.3s ease-in-out;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
 }
 
 /* Dark theme background */
@@ -54,6 +63,7 @@ h1 {
 
 /* Main container */
 .container {
+    width: 100%;
     max-width: 500px;
     margin: 0 auto;
     background-color: var(--background-color);
