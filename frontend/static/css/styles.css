@@ -16,7 +16,7 @@
 html, body {
     height: 100vh;
     margin: 0;
-    overflow: hidden;
+    overflow: auto;
 }
 
 
@@ -65,7 +65,7 @@ h1 {
 .container {
     width: 100%;
     max-width: 500px;
-    margin: 0 auto;
+    margin: auto auto auto auto;
     background-color: var(--background-color);
     border-radius: 10px;
     box-shadow: var(--card-shadow);
