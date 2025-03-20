@@ -1,5 +1,5 @@
 # GrafikPlusWeb 
-<a href="https://www.grafikplus.xce.pl/"><img alt="GrafikPlusWeb Banner" src="\docs\images\GrafikPlus_banner.png" width="480"/></a>
+<a href="https://www.grafikplus.xce.pl/"><img alt="GrafikPlusWeb Banner" src="https://github.com/Szafranee/GrafikPlusWeb/blob/772b940e6a7712041a7b78b7c584f4c0427829ed/docs/images/GrafikPlus_banner.png" width="480"/></a>
 
 > 🇵🇱 **GrafikPlusWeb** to narzędzie webowe do pobierania i konwertowania grafików pracy Canal+ do plików Excel (.xlsx). Aplikacja dostępna jest pod adresem [grafikplus.xce.pl](https://grafikplus.xce.pl)
 
