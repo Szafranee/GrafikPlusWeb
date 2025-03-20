@@ -28,14 +28,22 @@ document.addEventListener('alpine:init', () => {
         },
 
         scrollToMessage() {
-            // Wait for the DOM to update before scrolling
-            this.$nextTick(() => {
+            // Wait for the DOM to update and message to be visible
+            setTimeout(() => {
                 const messageElement = document.querySelector('.success-message');
                 if (messageElement) {
-                    const y = messageElement.getBoundingClientRect().top + window.pageYOffset;
-                    window.scrollTo({top: y, behavior: 'smooth'});
+                    // Calculate the element's position relative to the viewport
+                    const elementRect = messageElement.getBoundingClientRect();
+                    const absoluteElementTop = elementRect.top + window.pageYOffset;
+                    const middle = absoluteElementTop - (window.innerHeight / 2) + (elementRect.height / 2);
+                    
+                    // Smooth scroll to the element
+                    window.scrollTo({
+                        top: middle,
+                        behavior: 'smooth'
+                    });
                 }
-            });
+            }, 100); // Small delay to ensure the message is rendered
         },
 
         async submitForm() {

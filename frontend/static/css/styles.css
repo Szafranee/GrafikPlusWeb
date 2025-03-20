@@ -14,9 +14,11 @@
 
 /* Ensure full height for html and body */
 html, body {
-    height: 100vh;
+    min-height: 100vh;
     margin: 0;
-    overflow: auto;
+    padding: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 
@@ -37,7 +39,8 @@ body {
     transition: background 0.5s ease-in-out, color 0.3s ease-in-out;
     box-sizing: border-box;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
+    justify-content: center;
 }
 
 /* Dark theme background */
@@ -294,6 +297,9 @@ button[type="submit"]:active {
     opacity: 0;
     transform: translateY(-10px);
     animation: fadeIn 0.5s forwards;
+    position: relative;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 /* Fade-in animation */
