@@ -1,5 +1,7 @@
+import os
 from dataclasses import dataclass
 from pathlib import Path
+from backend.program_titles import ProgramTitles
 
 @dataclass
 class ScheduleConfig:
@@ -16,8 +18,16 @@ class ScheduleConfig:
     end_date: str
     is_personal: bool
 
+    # Program titles file
+    program_titles_csv: str = os.path.join(os.path.dirname(__file__), "data", "program_titles.csv")
+
+
     def get_full_output_path(self) -> Path:
         return Path(self.output_dir) / self.output_filename
+
+    def get_program_titles_dict(self) -> dict:
+        """Get program titles using singleton"""
+        return ProgramTitles().get_titles(self.program_titles_csv)
 
 @dataclass
 class ScraperConfig:

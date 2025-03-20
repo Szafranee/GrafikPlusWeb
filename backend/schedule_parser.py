@@ -65,6 +65,39 @@ class ScheduleParser:
             return self.__convert_date(date_header.text.strip())
         return None
 
+    def __get_program_title_from_description(self, description: str) -> str:
+        """Get program title for given description from titles dictionary
+
+        Args:
+            description: Program description to look up
+
+        Returns:
+            Matching program title or original description if not found
+        """
+
+        if not description:
+            return ''
+
+        # Cache titles dictionary as class attribute to avoid multiple reads
+        if not hasattr(self, '_titles_dict'):
+            try:
+                self._titles_dict = self.schedule_config.get_program_titles_dict()
+                if not self._titles_dict:
+                    logging.warning("Program titles dictionary is empty.")
+            except Exception as e:
+                logging.error(f"Failed to load program titles: {e}")
+                self._titles_dict = {}
+
+
+        # Return mapped title or original description
+        program_title = self._titles_dict.get(description)
+        if not program_title:
+            logging.debug(f"Program title not found for description: {description}")
+            return description
+
+        return program_title
+
+
     def parse_general_schedule(self) -> List[Dict]:
         """Parse schedule data from HTML content with sequential row processing"""
         current_date = None
@@ -101,12 +134,14 @@ class ScheduleParser:
                 duration = self.__calculate_duration(start_time, end_time)
                 editor = cells[11].text.strip()
 
-                # program_title and activity columns are always empty because that's what the "client" wanted
+                # Get program title from description
+                program_title = self.__get_program_title_from_description(program_description)
+                
                 self.schedule_data.append({
                     'date': current_date,
-                    'program_title': '', # Always empty
+                    'program_title': program_title,
                     'description': program_description,
-                    'activity': '', # Always empty
+                    'activity': '', # Always empty as per client request
                     'duration': duration,
                     'start_time': start_time,
                     'end_time': end_time,
@@ -163,12 +198,14 @@ class ScheduleParser:
                 end_time = times[1].strip().replace('\xa0', '')
                 duration = self.__calculate_duration(start_time, end_time)
 
-                # program_title and activity columns are always empty because that's what the "client" wanted
+                # Get program title from description
+                program_title = self.__get_program_title_from_description(program_description)
+                
                 self.schedule_data.append({
                     'date': current_date,
-                    'program_title': '', # Always empty
+                    'program_title': program_title,
                     'description': program_description,
-                    'activity': '', # Always empty
+                    'activity': '', # Always empty as per client request
                     'duration': duration,
                     'start_time': start_time,
                     'end_time': end_time,
