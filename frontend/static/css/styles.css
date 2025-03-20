@@ -226,7 +226,7 @@ input[type="date"] {
 /* Theme toggle button */
 .theme-toggle {
     position: absolute;
-    top: 20px;
+    top: 15px;
     right: 20px;
     width: 40px;
     height: 40px;
