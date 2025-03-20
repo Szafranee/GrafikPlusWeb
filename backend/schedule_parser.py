@@ -89,11 +89,11 @@ class ScheduleParser:
                 self._titles_dict = {}
 
 
-        # Return mapped title or original description
+        # Return mapped title or nothing if not found
         program_title = self._titles_dict.get(description)
         if not program_title:
             logging.debug(f"Program title not found for description: {description}")
-            return description
+            return ''
 
         return program_title
 
