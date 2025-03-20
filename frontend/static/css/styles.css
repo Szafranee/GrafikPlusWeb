@@ -45,12 +45,49 @@ body {
     background: linear-gradient(180deg, #1a1a1a, #2c5898);
 }
 
+/* Logo container for proper alignment */
+.logo-container {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
 /* Header styles */
 h1 {
     text-align: left;
     margin-bottom: 20px;
     margin-top: 0;
     font-size: 40px;
+}
+
+
+/* Logo styles */
+.logo {
+    margin-bottom: 10px;
+    margin-top: 5px;
+    margin-left: 10px;
+    width: 240px;
+    height: auto;
+    transition: opacity var(--transition-speed);
+}
+
+/* Light theme logo - visible by default */
+.logo-light {
+    display: block;
+}
+
+.logo-dark {
+    display: none;
+}
+
+/* Dark theme logo visibility */
+.dark .logo-light {
+    display: none;
+}
+
+.dark .logo-dark {
+    display: block;
 }
 
 /* Plus sign styles */
