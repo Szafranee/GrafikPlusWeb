@@ -20,7 +20,6 @@ A web-based version of [GrafikPlus](https://github.com/Szafranee/GrafikPlus) - a
   - Automatic mapping of program descriptions to standardized titles using CSV configuration
   - Live configuration updates - changes to mapping file are detected and applied automatically without restart
   - Efficient caching mechanism to optimize performance
-  - Fallback to original descriptions if mapping is not found
 
 ## 🚀 Quick Start
 
