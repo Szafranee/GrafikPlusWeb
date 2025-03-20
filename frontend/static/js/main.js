@@ -12,11 +12,13 @@ document.addEventListener('alpine:init', () => {
 
         initializeDates() {
             const today = new Date();
-            const year = today.getFullYear();
+            const currentYear = today.getFullYear();
 
-            this.minDate = `${year}-01-01`;
-            this.maxDate = `${year}-12-31`;
+            // Set date range to previous year and next year
+            this.minDate = `${currentYear - 1}-01-01`;
+            this.maxDate = `${currentYear + 1}-12-31`;
 
+            // Set current week as default selection
             const currentDay = today.getDay();
             const monday = new Date(today);
             monday.setDate(today.getDate() - currentDay + 1);
