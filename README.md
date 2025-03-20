@@ -16,6 +16,11 @@ A web-based version of [GrafikPlus](https://github.com/Szafranee/GrafikPlus) - a
 - Customizable output file name and location
 - Light/Dark theme (follows system settings)
 - No installation required - just visit the website
+- **Program Title Mapping**:
+  - Automatic mapping of program descriptions to standardized titles using CSV configuration
+  - Live configuration updates - changes to mapping file are detected and applied automatically without restart
+  - Efficient caching mechanism to optimize performance
+  - Fallback to original descriptions if mapping is not found
 
 ## 🚀 Quick Start
 
@@ -79,14 +84,16 @@ python app.py
 grafikplusweb/
 ├── app.py                 # Flask application entry point
 ├── backend/
-│   ├── api/               # API endpoints
-│   ├── config.py          # Configuration settings
+│   ├── api/              # API endpoints
+│   ├── config.py         # Configuration settings
 │   ├── schedule_parser.py # Schedule parsing logic
-│   └── schedule_scraper.py # Web scraping functionality
+│   ├── schedule_scraper.py # Web scraping functionality
+│   └── data/
+│       └── program_titles.csv # Program titles mapping (auto-refreshed)
 ├── frontend/
-│   ├── static/            # Static assets (CSS, JS, images)
-│   └── templates/         # HTML templates
-└── run.py                 # Production server runner
+│   ├── static/           # Static assets (CSS, JS, images)
+│   └── templates/        # HTML templates
+└── run.py                # Production server runner
 ```
 
 ## 🔒 Security
