@@ -5,6 +5,8 @@ from typing import List, Dict, Optional
 
 import pandas as pd
 from bs4 import BeautifulSoup
+from openpyxl.worksheet.table import Table, TableStyleInfo
+from openpyxl.utils import get_column_letter
 
 from backend.config import ScheduleConfig
 
@@ -283,10 +285,26 @@ class ScheduleParser:
                 except (ValueError, TypeError):
                     logging.warning(f"Could not convert value {cell.value} to float")
 
+            # Create Excel Table (with auto-filter, sorting and built-in styling)
+            num_rows = len(df)
+            num_cols = len(headers)
+            last_col_letter = get_column_letter(num_cols)
+            table_ref = f"A1:{last_col_letter}{num_rows + 1}"
+
+            table = Table(displayName="GrafikPlus", ref=table_ref)
+            table.tableStyleInfo = TableStyleInfo(
+                name="TableStyleMedium9",
+                showFirstColumn=False,
+                showLastColumn=False,
+                showRowStripes=True,
+                showColumnStripes=False
+            )
+            worksheet.add_table(table)
+
             # Adjust column widths
             for idx, col in enumerate(worksheet.columns, 1):
                 max_length = 0
-                column = worksheet.column_dimensions[chr(64 + idx)]
+                column = worksheet.column_dimensions[get_column_letter(idx)]
 
                 for cell in col:
                     try:

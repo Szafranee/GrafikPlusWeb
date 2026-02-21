@@ -3,6 +3,7 @@ BOXING WORLD WEEKLY;BOXING WORLD WEEKLY
 EPG;Ekstraklasa Po Godzinach
 EKSTRAPAKA;Liga Polska - Ekstraklasa
 ESA SKRÓT;Liga Polska - Ekstraklasa
+ESA SKRÓTY;Liga Polska - Ekstraklasa
 ESA SKRÓT + ESA HIGHLIGHT SHOW;Liga Polska - Ekstraklasa
 ODPRAWA PRZEDMECZOWA;Liga Polska - Ekstraklasa
 PIŁKARSKI MŁYN;Liga Polska - Ekstraklasa
@@ -19,6 +20,7 @@ NBA ACTION;NBA ACTION
 SPORT+;SPORT+ 
 EKSTRAKLASA HIGHLIGHTS SHOW;SPORT+ 
 SUPER PIĄTEK;Superpiątek
+SUPERPIĄTEK;Superpiątek
 RAPORT TENISOWY;Tenis WTA
 STUDIO TENIS;Tenis WTA
 TENIS RAPORT;Tenis WTA
@@ -27,7 +29,9 @@ TURBOKOZAK EXTRA;Turbokozak
 LIGA MISTRZÓW;UEFA Champions League
 LIGA MISTRZÓW SKRÓT;UEFA Champions League
 LIGA MISTRZÓW STUDIO LM;UEFA Champions League
+LIGA MISTRZÓW STUDIO;UEFA Champions League
 Champions Club;UEFA Champions League
+JWPL;Jej Wysokość Premier League
 STUDIO CC;UEFA Champions League
 MAGAZYN CC;UEFA Champions League
 MAGAZYN LIGI MISTRZÓW;UEFA Champions League
