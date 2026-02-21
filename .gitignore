@@ -1,3 +1,7 @@
+# Deploy config files (contain server credentials - do NOT commit!)
+deploy.config.ps1
+deploy.config.sh
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -171,3 +175,4 @@ cython_debug/
 .pypirc
 
 .qodo
+/deploy.config.sh

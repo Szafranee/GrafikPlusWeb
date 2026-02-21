@@ -1,0 +1,79 @@
+# ============================================================
+#  deploy.config.ps1 - Server configuration for deploy.ps1
+#  This file is in .gitignore - it will NOT be committed!
+#
+#  SETUP: copy this file to deploy.config.ps1 and fill in your values.
+#         cp deploy.config.ps1.example deploy.config.ps1
+# ============================================================
+
+# ── Server connection ────────────────────────────────────────
+$SERVER_USER     = "user"                          # SSH username
+$SERVER_HOST     = "your-server.com"               # IP address or domain
+$SERVER_PORT     = 22                              # SSH port
+$SSH_KEY         = "$HOME\.ssh\id_rsa"             # path to SSH key (or "" to use password)
+$REMOTE_APP_DIR  = "/home/user/GrafikPlusWeb"      # path to the app on the server
+
+# Command to restart the application on the server (e.g. systemd, supervisor, gunicorn)
+# Leave "" to skip automatic restart
+$RESTART_COMMAND = "sudo systemctl restart grafikplus"
+
+# ── Application name (shown in deploy menu) ─────────────────
+$APP_NAME = "GrafikPlusWeb"
+
+# ── Tracked files (used for change detection) ───────────────
+# Add any new file here to include it in the "changed" preset.
+$ALL_FILES = @(
+    "app.py"
+    "run.py"
+    "requirements.txt"
+    "backend/config.py"
+    "backend/program_titles.py"
+    "backend/schedule_parser.py"
+    "backend/schedule_scraper.py"
+    "backend/api/routes.py"
+    "backend/data/program_titles.csv"
+    "frontend/templates/index.html"
+    "frontend/static/css/styles.css"
+    "frontend/static/js/main.js"
+    "frontend/static/img/favicon.ico"
+)
+
+# ── Deploy presets ───────────────────────────────────────────
+# Each preset is a list of files/directories to upload.
+# Directories (trailing /) are uploaded recursively.
+$PRESETS = @{
+    "all"      = @(
+        "app.py"
+        "run.py"
+        "requirements.txt"
+        "backend/"
+        "frontend/"
+    )
+    "backend"  = @(
+        "app.py"
+        "run.py"
+        "backend/"
+    )
+    "frontend" = @(
+        "frontend/"
+    )
+    "python"   = @(
+        "app.py"
+        "run.py"
+        "backend/config.py"
+        "backend/program_titles.py"
+        "backend/schedule_parser.py"
+        "backend/schedule_scraper.py"
+        "backend/api/routes.py"
+    )
+    "csv"      = @(
+        "backend/data/program_titles.csv"
+    )
+    "static"   = @(
+        "frontend/static/"
+    )
+    "config"   = @(
+        "backend/config.py"
+    )
+}
+

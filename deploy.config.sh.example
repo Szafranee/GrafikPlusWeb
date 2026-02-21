@@ -1,0 +1,57 @@
+# shellcheck shell=bash
+# shellcheck disable=SC2034  # variables are used externally via: source deploy.config.sh
+# ============================================================
+#  deploy.config.sh - Server configuration for deploy.sh
+#  This file is in .gitignore - it will NOT be committed!
+#
+#  SETUP: copy this file to deploy.config.sh and fill in your values.
+#         cp deploy.config.sh.example deploy.config.sh
+# ============================================================
+
+# ── Server connection ────────────────────────────────────────
+export SERVER_USER="user"                          # SSH username
+export SERVER_HOST="your-server.com"               # IP address or domain
+export SERVER_PORT=22                              # SSH port
+export SSH_KEY="$HOME/.ssh/id_rsa"                 # path to SSH key (or "" to use password)
+export REMOTE_APP_DIR="/home/user/GrafikPlusWeb"   # path to the app on the server
+
+# Command to restart the application on the server (e.g. systemd, supervisor, gunicorn)
+# Leave "" to skip automatic restart
+export RESTART_COMMAND="sudo systemctl restart grafikplus"
+
+# ── Application name (shown in deploy menu) ─────────────────
+export APP_NAME="GrafikPlusWeb"
+
+# ── Tracked files (used for change detection) ───────────────
+# Add any new file here to include it in the "changed" preset.
+ALL_FILES=(
+    "app.py"
+    "run.py"
+    "requirements.txt"
+    "backend/config.py"
+    "backend/program_titles.py"
+    "backend/schedule_parser.py"
+    "backend/schedule_scraper.py"
+    "backend/api/routes.py"
+    "backend/data/program_titles.csv"
+    "frontend/templates/index.html"
+    "frontend/static/css/styles.css"
+    "frontend/static/js/main.js"
+    "frontend/static/img/favicon.ico"
+)
+
+# ── Deploy presets ───────────────────────────────────────────
+# Each preset is a list of files/directories to upload.
+# Directories (trailing /) are uploaded recursively.
+# To add a custom preset: PRESETS["mypreset"]="file1 dir1/ file2"
+declare -A PRESETS
+PRESETS["all"]="app.py run.py requirements.txt backend/ frontend/"
+PRESETS["backend"]="app.py run.py backend/"
+PRESETS["frontend"]="frontend/"
+PRESETS["python"]="app.py run.py backend/config.py backend/program_titles.py backend/schedule_parser.py backend/schedule_scraper.py backend/api/routes.py"
+PRESETS["csv"]="backend/data/program_titles.csv"
+PRESETS["static"]="frontend/static/"
+PRESETS["config"]="backend/config.py"
+
+
+
