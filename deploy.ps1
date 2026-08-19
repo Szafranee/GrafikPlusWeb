@@ -6,7 +6,8 @@
 #    .\deploy.ps1 -Preset changed      -> only files changed vs server (default)
 #    .\deploy.ps1 -Preset all          -> all files
 #    .\deploy.ps1 -Preset backend      -> backend files only
-#    .\deploy.ps1 -Files "app.py","requirements.txt"  -> specific files
+#    .\deploy.ps1 -Files "app.py","pyproject.toml"  -> specific files
+#    .\deploy.ps1 -Preset dependencies -> dependencies + remote uv sync
 #    .\deploy.ps1 -Preset backend -NoRestart           -> skip restart
 # ============================================================
 
@@ -46,6 +47,35 @@ function Get-ScpArgs {
     return $scpParams
 }
 
+function Test-ExcludedPath {
+    param([string]$Path)
+
+    $normalizedPath = $Path -replace '\\', '/'
+    return $normalizedPath -match '(^|/)(\.venv|\.uv|__pycache__)(/|$)'
+}
+
+function Test-DependencyFilesIncluded {
+    param([string[]]$Items)
+
+    foreach ($item in $Items) {
+        $normalizedItem = ($item -replace '\\', '/') -replace '^\./', ''
+        $normalizedItem = $normalizedItem.TrimEnd('/')
+
+        if ($normalizedItem -in @('pyproject.toml', 'uv.lock')) {
+            return $true
+        }
+
+        $localPath = Join-Path $PSScriptRoot $item
+        if ((Test-Path -LiteralPath $localPath -PathType Container) -and
+            ((Test-Path -LiteralPath (Join-Path $localPath 'pyproject.toml') -PathType Leaf) -or
+             (Test-Path -LiteralPath (Join-Path $localPath 'uv.lock') -PathType Leaf))) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
 # ── Smart File Search ────────────────────────────────────────
 function Find-ProjectFile {
     param([string]$SearchTerm)
@@ -58,7 +88,7 @@ function Find-ProjectFile {
     # 2. Search recursively for files with that name
     $filter = "*$SearchTerm*"
     $foundFiles = Get-ChildItem -Path $PSScriptRoot -Recurse -Filter $filter -File -ErrorAction SilentlyContinue |
-               Where-Object { $_.FullName -notmatch "\\(__pycache__|\.git|venv|env)\\" }
+               Where-Object { $_.FullName -notmatch "\\(__pycache__|\.git|\.venv|\.uv|venv|env)\\" }
 
     if ($foundFiles.Count -eq 1) {
         # Found exactly one match
@@ -171,6 +201,12 @@ function Get-ChangedFiles {
 function Send-Item {
     param([string]$LocalItem)
 
+    $LocalItem = $LocalItem -replace '\\', '/'
+    if (Test-ExcludedPath $LocalItem) {
+        Write-Host "  [SKIP] Excluded path: $LocalItem" -ForegroundColor DarkGray
+        return
+    }
+
     $LocalPath = Join-Path $PSScriptRoot $LocalItem
 
     if (-not (Test-Path $LocalPath)) {
@@ -178,22 +214,27 @@ function Send-Item {
         return
     }
 
-    $ScpArgs = Get-ScpArgs
-
     if ((Get-Item $LocalPath).PSIsContainer) {
-        # Directory - recursive; scp into parent dir on remote
-        $LocalPath = $LocalPath.TrimEnd('\').TrimEnd('/')
-        $RemoteDir = "$SERVER_USER@${SERVER_HOST}:$(($REMOTE_APP_DIR + '/' + $LocalItem).TrimEnd('/') | Split-Path -Parent)"
-        $ScpArgs += @("-r", $LocalPath, $RemoteDir)
-    } else {
-        # File - ensure remote directory exists first
-        $RemoteDir = ($REMOTE_APP_DIR + "/" + $LocalItem) | Split-Path -Parent
-        $RemoteDir = $RemoteDir -replace '\\', '/'
-        $SshArgs = Get-SshArgs
-        $SshArgs += @("$SERVER_USER@$SERVER_HOST", "mkdir -p '$RemoteDir'")
-        ssh @SshArgs 2>$null
-        $ScpArgs += @($LocalPath, "$SERVER_USER@${SERVER_HOST}:$REMOTE_APP_DIR/$LocalItem")
+        # Upload directory contents individually so excluded directories are never passed to SCP.
+        Get-ChildItem -LiteralPath $LocalPath -Recurse -File -ErrorAction SilentlyContinue |
+            ForEach-Object {
+                $relativePath = $_.FullName.Substring($PSScriptRoot.Length + 1) -replace '\\', '/'
+                if (-not (Test-ExcludedPath $relativePath)) {
+                    Send-Item -LocalItem $relativePath
+                }
+            }
+        return
     }
+
+    # Ensure the remote directory exists before uploading the file.
+    $RemoteDir = ($REMOTE_APP_DIR + "/" + $LocalItem) | Split-Path -Parent
+    $RemoteDir = $RemoteDir -replace '\\', '/'
+    $SshArgs = Get-SshArgs
+    $SshArgs += @("$SERVER_USER@$SERVER_HOST", "mkdir -p '$RemoteDir'")
+    ssh @SshArgs 2>$null
+
+    $ScpArgs = Get-ScpArgs
+    $ScpArgs += @($LocalPath, "$SERVER_USER@${SERVER_HOST}:$REMOTE_APP_DIR/$LocalItem")
 
     Write-Host "  -> $LocalItem" -ForegroundColor Cyan -NoNewline
 
@@ -203,6 +244,7 @@ function Send-Item {
     } else {
         Write-Host "  [ERROR]" -ForegroundColor Red
         Write-Host "     $result" -ForegroundColor DarkRed
+        $script:UploadFailed = $true
     }
 }
 
@@ -224,7 +266,8 @@ function Show-Menu {
     Write-Host "  [5] csv       - backend/data/program_titles.csv" -ForegroundColor Yellow
     Write-Host "  [6] static    - frontend/static/ (CSS, JS, img)" -ForegroundColor Yellow
     Write-Host "  [7] config    - backend/config.py" -ForegroundColor Yellow
-    Write-Host "  [8] custom    - enter paths manually (SMART SEARCH)" -ForegroundColor Yellow
+    Write-Host "  [8] dependencies - pyproject.toml + uv.lock (runs uv sync)" -ForegroundColor Yellow
+    Write-Host "  [9] custom    - enter paths manually (SMART SEARCH)" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "  [Q] Quit" -ForegroundColor DarkGray
     Write-Host ""
@@ -241,7 +284,8 @@ function Show-Menu {
         "5" { return "csv" }
         "6" { return "static" }
         "7" { return "config" }
-        "8" { return "custom" }
+        "8" { return "dependencies" }
+        "9" { return "custom" }
         "Q" { exit 0 }
         default {
             Write-Host "Unknown option." -ForegroundColor Red
@@ -254,6 +298,7 @@ function Show-Menu {
 Write-Host ""
 
 $itemsToSend = @()
+$script:UploadFailed = $false
 
 if ($Files.Count -gt 0) {
     # Mode: -Files "a.py","b.py"
@@ -345,7 +390,28 @@ foreach ($item in $itemsToSend) {
     Send-Item -LocalItem ($item -replace '\\', '/')
 }
 
-# Restart service
+if ($script:UploadFailed) {
+    Write-Host "Upload failed; dependency synchronization and restart were skipped." -ForegroundColor Red
+    exit 1
+}
+
+# Synchronize production dependencies when dependency metadata was uploaded.
+if (Test-DependencyFilesIncluded -Items $itemsToSend) {
+    Write-Host ""
+    Write-Host "Synchronizing production dependencies on server..." -ForegroundColor White
+
+    $SyncCommand = "cd `"${REMOTE_APP_DIR}`" && uv sync --frozen --no-dev"
+    $SshArgs = Get-SshArgs
+    $SshArgs += @("$SERVER_USER@$SERVER_HOST", $SyncCommand)
+    ssh @SshArgs
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Dependency synchronization failed; application was not restarted." -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "Dependencies synchronized successfully." -ForegroundColor Green
+}
+
+# Trigger a Phusion Passenger restart.
 if (-not $NoRestart -and $RESTART_COMMAND -ne "") {
     Write-Host ""
     Write-Host "Restarting application on server..." -ForegroundColor White

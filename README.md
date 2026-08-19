@@ -63,25 +63,47 @@ A web-based version of [GrafikPlus](https://github.com/Szafranee/GrafikPlus) - a
 ## 🧪 Development
 
 ### Prerequisites
-- Python 3.x
+- Python 3.13 or newer
 - Git
+- [uv](https://docs.astral.sh/uv/getting-started/installation/)
 
 ### Local Setup
+
 ```bash
 # Clone the repository
 git clone https://github.com/yourusername/GrafikPlusWeb.git
+cd GrafikPlusWeb
 
-# Install dependencies
-pip install -r requirements.txt
+# Create the local environment and install the locked dependencies
+uv sync
 
 # Run development server
-python app.py
+uv run python run.py
 ```
+
+### Dependency Management
+
+Use `uv` for all dependency changes so that `pyproject.toml` and `uv.lock` stay in sync:
+
+```bash
+# Add a runtime dependency
+uv add package-name
+
+# Upgrade and install all dependencies
+uv lock --upgrade && uv sync
+```
+
+## 🚢 Deployment
+
+The project includes PowerShell and Bash deployment scripts with presets, changed-file detection, remote dependency synchronization, and Phusion Passenger restarts. See [DEPLOYMENT.md](DEPLOYMENT.md) for setup and usage.
 
 ## 🔍 Project Structure
 ```
 grafikplusweb/
 ├── app.py                 # Flask application entry point
+├── pyproject.toml         # Project metadata and dependencies
+├── uv.lock                # Reproducible dependency lock file
+├── .python-version        # Python version used by uv
 ├── backend/
 │   ├── api/              # API endpoints
 │   ├── config.py         # Configuration settings

@@ -1,6 +1,20 @@
 [project]
 name = "grafikplusweb"
 version = "0.1.0"
-description = "Add your description here"
+description = "Web application for downloading and converting Canal+ work schedules to Excel"
+readme = "README.md"
+license = "MIT"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "beautifulsoup4",
+    "flask",
+    "flask-cors",
+    "gunicorn",
+    "openpyxl",
+    "pandas",
+    "python-dotenv",
+    "requests",
+]
+
+[tool.uv]
+package = false

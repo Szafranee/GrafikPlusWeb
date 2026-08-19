@@ -7,7 +7,8 @@
 #    ./deploy.sh --preset changed       -> only files changed vs server (default)
 #    ./deploy.sh --preset all           -> all files
 #    ./deploy.sh --preset backend       -> backend files only
-#    ./deploy.sh --files "app.py,requirements.txt"  -> specific files
+#    ./deploy.sh --files "app.py,pyproject.toml"  -> specific files
+#    ./deploy.sh --preset dependencies -> dependencies + remote uv sync
 #    ./deploy.sh --preset backend --no-restart      -> skip restart
 # ============================================================
 
@@ -45,11 +46,56 @@ build_scp_args() {
     if [[ -n "$SSH_KEY" ]]; then SCP_ARGS+=(-i "$SSH_KEY"); fi
 }
 
+is_excluded_path() {
+    local path="/${1//\\//}/"
+    [[ "$path" == */.venv/* || "$path" == */.uv/* || "$path" == */__pycache__/* ]]
+}
+
+selection_includes_dependencies() {
+    local item normalized local_path
+    for item in "$@"; do
+        normalized="${item#./}"
+        normalized="${normalized%/}"
+        if [[ "$normalized" == "pyproject.toml" || "$normalized" == "uv.lock" ]]; then
+            return 0
+        fi
+
+        local_path="$SCRIPT_DIR/$item"
+        if [[ -d "$local_path" && ( -f "$local_path/pyproject.toml" || -f "$local_path/uv.lock" ) ]]; then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+# Finds exact paths first, then partial filename matches for interactive custom deploys.
+find_project_file() {
+    local term="$1"
+    if [[ -e "$SCRIPT_DIR/$term" ]] && ! is_excluded_path "$term"; then
+        printf '%s\n' "$term"
+        return
+    fi
+
+    local found=false path relative_path
+    while IFS= read -r -d '' path; do
+        relative_path="${path#"$SCRIPT_DIR/"}"
+        printf '%s\n' "$relative_path"
+        found=true
+    done < <(find "$SCRIPT_DIR" \
+        \( -type d \( -name .git -o -name .venv -o -name .uv -o -name __pycache__ \) -prune \) -o \
+        -type f -iname "*$term*" -print0)
+
+    if [[ "$found" == false ]]; then
+        echo "  [X] File not found: $term" >&2
+    fi
+}
+
 # ── Detect changed files ─────────────────────────────────────
 # Compares MD5 hashes of all files in ALL_FILES between local and remote.
 # Prints files that are new or have changed content.
 get_changed_files() {
-    echo ""
+    echo "" >&2
     echo "Checking for changes against server..." >&2
 
     # Build remote file list as space-separated string
@@ -100,8 +146,10 @@ get_changed_files() {
         fi
     done
 
-    # Output result to stdout (caller captures it)
-    printf '%s\n' "${changed[@]}"
+    # Output results to stdout for the caller to capture.
+    if [[ ${#changed[@]} -gt 0 ]]; then
+        printf '%s\n' "${changed[@]}"
+    fi
 }
 
 # ── Function: upload a file or directory ────────────────────
@@ -109,8 +157,25 @@ send_item() {
     local item="$1"
     local local_path="$SCRIPT_DIR/$item"
 
+    if is_excluded_path "$item"; then
+        echo "  [SKIP] Excluded path: $item"
+        return
+    fi
+
     if [[ ! -e "$local_path" ]]; then
         echo "  [SKIP] Not found: $item"
+        return
+    fi
+
+    if [[ -d "$local_path" ]]; then
+        # Upload directory contents individually so excluded directories are never passed to SCP.
+        local child relative_path
+        while IFS= read -r -d '' child; do
+            relative_path="${child#"$SCRIPT_DIR/"}"
+            send_item "$relative_path"
+        done < <(find "$local_path" \
+            \( -type d \( -name .venv -o -name .uv -o -name __pycache__ \) -prune \) -o \
+            -type f -print0)
         return
     fi
 
@@ -119,51 +184,43 @@ send_item() {
 
     printf "  -> %s" "$item"
 
-    if [[ -d "$local_path" ]]; then
-        # Directory - recursive; scp into parent directory on remote
-        local remote_parent
-        remote_parent="$REMOTE_APP_DIR/$(dirname "$item")"
-        ssh "${SSH_ARGS[@]}" "$SERVER_USER@$SERVER_HOST" "mkdir -p ${remote_parent@Q}" 2>/dev/null || true
-        if scp "${SCP_ARGS[@]}" -r "${local_path%/}" "$SERVER_USER@$SERVER_HOST:$remote_parent" 2>&1; then
-            echo "  [OK]"
-        else
-            echo "  [ERROR]"
-        fi
+    # Ensure the remote directory exists before uploading the file.
+    local remote_dir
+    remote_dir="$REMOTE_APP_DIR/$(dirname "$item")"
+    ssh "${SSH_ARGS[@]}" "$SERVER_USER@$SERVER_HOST" "mkdir -p ${remote_dir@Q}" 2>/dev/null || true
+    if scp "${SCP_ARGS[@]}" "$local_path" "$SERVER_USER@$SERVER_HOST:$REMOTE_APP_DIR/$item" 2>&1; then
+        echo "  [OK]"
     else
-        # File - ensure remote directory exists first
-        local remote_dir
-        remote_dir="$REMOTE_APP_DIR/$(dirname "$item")"
-        ssh "${SSH_ARGS[@]}" "$SERVER_USER@$SERVER_HOST" "mkdir -p ${remote_dir@Q}" 2>/dev/null || true
-        if scp "${SCP_ARGS[@]}" "$local_path" "$SERVER_USER@$SERVER_HOST:$REMOTE_APP_DIR/$item" 2>&1; then
-            echo "  [OK]"
-        else
-            echo "  [ERROR]"
-        fi
+        echo "  [ERROR]"
+        return 1
     fi
 }
 
 # ── Interactive menu ─────────────────────────────────────────
 show_menu() {
-    echo ""
-    echo "=================================================="
-    echo "  $APP_NAME - Deploy to server"
-    echo "  $SERVER_USER@$SERVER_HOST -> $REMOTE_APP_DIR"
-    echo "=================================================="
-    echo ""
-    echo "  Select what to deploy:"
-    echo ""
-    echo "  [0] changed   - only files changed vs server (DEFAULT)"
-    echo "  [1] all       - everything (backend + frontend)"
-    echo "  [2] backend   - app.py, run.py, backend/"
-    echo "  [3] frontend  - frontend/"
-    echo "  [4] python    - .py files only"
-    echo "  [5] csv       - backend/data/program_titles.csv"
-    echo "  [6] static    - frontend/static/ (CSS, JS, img)"
-    echo "  [7] config    - backend/config.py"
-    echo "  [8] custom    - enter paths manually"
-    echo ""
-    echo "  [Q] Quit"
-    echo ""
+    {
+        echo ""
+        echo "=================================================="
+        echo "  $APP_NAME - Deploy to server"
+        echo "  $SERVER_USER@$SERVER_HOST -> $REMOTE_APP_DIR"
+        echo "=================================================="
+        echo ""
+        echo "  Select what to deploy:"
+        echo ""
+        echo "  [0] changed   - only files changed vs server (DEFAULT)"
+        echo "  [1] all       - everything (backend + frontend)"
+        echo "  [2] backend   - app.py, run.py, backend/"
+        echo "  [3] frontend  - frontend/"
+        echo "  [4] python    - .py files only"
+        echo "  [5] csv       - backend/data/program_titles.csv"
+        echo "  [6] static    - frontend/static/ (CSS, JS, img)"
+        echo "  [7] config    - backend/config.py"
+        echo "  [8] dependencies - pyproject.toml + uv.lock (runs uv sync)"
+        echo "  [9] custom    - enter paths manually"
+        echo ""
+        echo "  [Q] Quit"
+        echo ""
+    } >&2
     read -rp "Choice [0]: " choice
     choice="${choice:-0}"
 
@@ -176,7 +233,8 @@ show_menu() {
         5) echo "csv" ;;
         6) echo "static" ;;
         7) echo "config" ;;
-        8) echo "custom" ;;
+        8) echo "dependencies" ;;
+        9) echo "custom" ;;
         Q) exit 0 ;;
         *)
             echo "Unknown option." >&2
@@ -286,7 +344,21 @@ for item in "${items_to_send[@]}"; do
     send_item "$item"
 done
 
-# Restart service
+# Synchronize production dependencies when dependency metadata was uploaded.
+if selection_includes_dependencies "${items_to_send[@]}"; then
+    echo ""
+    echo "Synchronizing production dependencies on server..."
+    build_ssh_args
+    if ssh "${SSH_ARGS[@]}" "$SERVER_USER@$SERVER_HOST" \
+        "cd ${REMOTE_APP_DIR@Q} && uv sync --frozen --no-dev"; then
+        echo "Dependencies synchronized successfully."
+    else
+        echo "Dependency synchronization failed; application was not restarted."
+        exit 1
+    fi
+fi
+
+# Trigger a Phusion Passenger restart.
 if [[ "$NO_RESTART" == false && -n "$RESTART_COMMAND" ]]; then
     echo ""
     echo "Restarting application on server..."
@@ -304,4 +376,3 @@ fi
 echo ""
 echo "Deploy complete!"
 echo ""
-

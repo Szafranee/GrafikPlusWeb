@@ -15,9 +15,9 @@ export SERVER_PORT=22                              # SSH port
 export SSH_KEY="$HOME/.ssh/id_rsa"                 # path to SSH key (or "" to use password)
 export REMOTE_APP_DIR="/home/user/GrafikPlusWeb"   # path to the app on the server
 
-# Command to restart the application on the server (e.g. systemd, supervisor, gunicorn)
+# Command to trigger a Phusion Passenger application restart
 # Leave "" to skip automatic restart
-export RESTART_COMMAND="sudo systemctl restart grafikplus"
+export RESTART_COMMAND="mkdir -p \"${REMOTE_APP_DIR}/tmp\" && touch \"${REMOTE_APP_DIR}/tmp/restart.txt\""
 
 # ── Application name (shown in deploy menu) ─────────────────
 export APP_NAME="GrafikPlusWeb"
@@ -27,7 +27,9 @@ export APP_NAME="GrafikPlusWeb"
 ALL_FILES=(
     "app.py"
     "run.py"
-    "requirements.txt"
+    ".python-version"
+    "pyproject.toml"
+    "uv.lock"
     "backend/config.py"
     "backend/program_titles.py"
     "backend/schedule_parser.py"
@@ -38,17 +40,19 @@ ALL_FILES=(
     "frontend/static/css/styles.css"
     "frontend/static/js/main.js"
     "frontend/static/img/favicon.ico"
+    "passenger_wsgi.py"
 )
 
 # ── Deploy presets ───────────────────────────────────────────
 # Each preset is a list of files/directories to upload.
-# Directories (trailing /) are uploaded recursively.
+# Directory contents (trailing /) are discovered recursively; excluded paths are skipped.
 # To add a custom preset: PRESETS["mypreset"]="file1 dir1/ file2"
 declare -A PRESETS
-PRESETS["all"]="app.py run.py requirements.txt backend/ frontend/"
+PRESETS["all"]="app.py run.py passenger_wsgi.py .python-version pyproject.toml uv.lock backend/ frontend/"
+PRESETS["dependencies"]="pyproject.toml uv.lock"
 PRESETS["backend"]="app.py run.py backend/"
 PRESETS["frontend"]="frontend/"
-PRESETS["python"]="app.py run.py backend/config.py backend/program_titles.py backend/schedule_parser.py backend/schedule_scraper.py backend/api/routes.py"
+PRESETS["python"]="app.py run.py passenger_wsgi.py backend/config.py backend/program_titles.py backend/schedule_parser.py backend/schedule_scraper.py backend/api/routes.py"
 PRESETS["csv"]="backend/data/program_titles.csv"
 PRESETS["static"]="frontend/static/"
 PRESETS["config"]="backend/config.py"

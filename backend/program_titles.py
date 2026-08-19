@@ -50,7 +50,7 @@ class ProgramTitles:
         """Load program titles from CSV file"""
         try:
             with open(csv_path, 'r', encoding='utf-8') as f:
-                reader = csv.reader(f, delimiter=';')  # Dodajemy delimiter=';'
+                reader = csv.reader(f, delimiter=';')  # The source file uses semicolon-separated values.
                 titles = {rows[0]: rows[1].strip('"') for rows in reader}
             logging.info(f"Program titles loaded successfully: {len(titles)} entries")
             return titles
