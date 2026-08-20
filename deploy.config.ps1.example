@@ -12,6 +12,7 @@ $SERVER_HOST     = "your-server.com"               # IP address or domain
 $SERVER_PORT     = 22                              # SSH port
 $SSH_KEY         = "$HOME\.ssh\id_rsa"             # path to SSH key (or "" to use password)
 $REMOTE_APP_DIR  = "/home/user/GrafikPlusWeb"      # path to the app on the server
+$SSH_HOST_KEY_POLICY = "accept-new"                 # safer than disabling host-key checks
 
 # Command to trigger a Phusion Passenger application restart
 # Leave "" to skip automatic restart
@@ -20,71 +21,9 @@ $RESTART_COMMAND = "mkdir -p `"${REMOTE_APP_DIR}/tmp`" && touch `"${REMOTE_APP_D
 # ── Application name (shown in deploy menu) ─────────────────
 $APP_NAME = "GrafikPlusWeb"
 
-# ── Tracked files (used for change detection) ───────────────
-# Add any new file here to include it in the "changed" preset.
-$ALL_FILES = @(
-    "app.py"
-    "run.py"
-    ".python-version"
-    "pyproject.toml"
-    "uv.lock"
-    "backend/config.py"
-    "backend/program_titles.py"
-    "backend/schedule_parser.py"
-    "backend/schedule_scraper.py"
-    "backend/api/routes.py"
-    "backend/data/program_titles.csv"
-    "frontend/templates/index.html"
-    "frontend/static/css/styles.css"
-    "frontend/static/js/main.js"
-    "frontend/static/img/favicon.ico"
-    "passenger_wsgi.py"
-)
-
-# ── Deploy presets ───────────────────────────────────────────
-# Each preset is a list of files/directories to upload.
-# Directory contents (trailing /) are discovered recursively; excluded paths are skipped.
-$PRESETS = @{
-    "all"      = @(
-        "app.py"
-        "run.py"
-        "passenger_wsgi.py"
-        ".python-version"
-        "pyproject.toml"
-        "uv.lock"
-        "backend/"
-        "frontend/"
-    )
-    "dependencies" = @(
-        "pyproject.toml"
-        "uv.lock"
-    )
-    "backend"  = @(
-        "app.py"
-        "run.py"
-        "backend/"
-    )
-    "frontend" = @(
-        "frontend/"
-    )
-    "python"   = @(
-        "app.py"
-        "run.py"
-        "passenger_wsgi.py"
-        "backend/config.py"
-        "backend/program_titles.py"
-        "backend/schedule_parser.py"
-        "backend/schedule_scraper.py"
-        "backend/api/routes.py"
-    )
-    "csv"      = @(
-        "backend/data/program_titles.csv"
-    )
-    "static"   = @(
-        "frontend/static/"
-    )
-    "config"   = @(
-        "backend/config.py"
-    )
-}
+# Files for the built-in presets are discovered automatically from Git.
+# Add only project-specific exclusions or genuinely custom presets here.
+$EXTRA_NEVER_DEPLOY_PATTERNS = @()
+$EXTRA_AUTO_DEPLOY_EXCLUDE_PATTERNS = @()
+$CUSTOM_DEPLOY_PRESETS = @{}
 

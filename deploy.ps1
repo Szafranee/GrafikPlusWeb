@@ -9,12 +9,14 @@
 #    .\deploy.ps1 -Files "app.py","pyproject.toml"  -> specific files
 #    .\deploy.ps1 -Preset dependencies -> dependencies + remote uv sync
 #    .\deploy.ps1 -Preset backend -NoRestart           -> skip restart
+#    .\deploy.ps1 -Preset all -DryRun                   -> preview without upload
 # ============================================================
 
 param(
     [string]$Preset    = "",
     [string[]]$Files   = @(),
-    [switch]$NoRestart
+    [switch]$NoRestart,
+    [switch]$DryRun
 )
 
 # ── Load configuration ──────────────────────────────────────
@@ -31,27 +33,155 @@ if ($SERVER_HOST -eq "your-server.com" -or $SERVER_USER -eq "user") {
     exit 1
 }
 
-# ── Predefined file sets ────────────────────────────────────
-# $ALL_FILES and $PRESETS are defined in deploy.config.ps1
-
 # ── SSH helper args ──────────────────────────────────────────
 function Get-SshArgs {
-    $sshParams = @("-p", $SERVER_PORT, "-o", "StrictHostKeyChecking=no")
+    $hostKeyPolicy = if ($SSH_HOST_KEY_POLICY) { $SSH_HOST_KEY_POLICY } else { "accept-new" }
+    $sshParams = @("-p", $SERVER_PORT, "-o", "StrictHostKeyChecking=$hostKeyPolicy")
     if ($SSH_KEY -ne "") { $sshParams += @("-i", $SSH_KEY) }
     return $sshParams
 }
 
 function Get-ScpArgs {
-    $scpParams = @("-P", $SERVER_PORT, "-o", "StrictHostKeyChecking=no")
+    $hostKeyPolicy = if ($SSH_HOST_KEY_POLICY) { $SSH_HOST_KEY_POLICY } else { "accept-new" }
+    $scpParams = @("-P", $SERVER_PORT, "-o", "StrictHostKeyChecking=$hostKeyPolicy")
     if ($SSH_KEY -ne "") { $scpParams += @("-i", $SSH_KEY) }
     return $scpParams
+}
+
+function Test-PathMatchesAnyPattern {
+    param(
+        [string]$Path,
+        [string[]]$Patterns
+    )
+
+    $normalizedPath = (($Path -replace '\\', '/') -replace '^\./', '').TrimEnd('/')
+    foreach ($pattern in $Patterns) {
+        if ($normalizedPath -like $pattern) { return $true }
+    }
+    return $false
+}
+
+$DefaultNeverDeployPatterns = @(
+    ".git", ".git/*", "*/.git", "*/.git/*",
+    ".env", ".env.*", "*/.env", "*/.env.*",
+    "deploy.config.ps1", "deploy.config.sh",
+    "instance", "instance/*", "*/instance", "*/instance/*",
+    ".venv", ".venv/*", "*/.venv", "*/.venv/*",
+    ".uv", ".uv/*", "*/.uv", "*/.uv/*",
+    "venv", "venv/*", "*/venv", "*/venv/*",
+    "env", "env/*", "*/env", "*/env/*",
+    "__pycache__", "*/__pycache__", "*/__pycache__/*",
+    ".pytest_cache", ".pytest_cache/*",
+    "*.pyc", "*.pyo", "*.log"
+)
+
+$DefaultAutoDeployExcludePatterns = @(
+    ".github", ".github/*", ".idea", ".idea/*",
+    "tests", "tests/*", "docs", "docs/*",
+    "README*", "LICENSE", "DEPLOYMENT.md", ".gitignore",
+    ".env.example",
+    "deploy.ps1", "deploy.sh",
+    "deploy.config.ps1.example", "deploy.config.sh.example",
+    "backend/data/program_titles.csv"
+)
+
+$NeverDeployPatterns = @($DefaultNeverDeployPatterns)
+if (Get-Variable -Name EXTRA_NEVER_DEPLOY_PATTERNS -ErrorAction SilentlyContinue) {
+    $NeverDeployPatterns += @($EXTRA_NEVER_DEPLOY_PATTERNS)
+}
+
+$AutoDeployExcludePatterns = @($DefaultAutoDeployExcludePatterns)
+if (Get-Variable -Name EXTRA_AUTO_DEPLOY_EXCLUDE_PATTERNS -ErrorAction SilentlyContinue) {
+    $AutoDeployExcludePatterns += @($EXTRA_AUTO_DEPLOY_EXCLUDE_PATTERNS)
 }
 
 function Test-ExcludedPath {
     param([string]$Path)
 
-    $normalizedPath = $Path -replace '\\', '/'
-    return $normalizedPath -match '(^|/)(\.venv|\.uv|__pycache__)(/|$)'
+    return Test-PathMatchesAnyPattern -Path $Path -Patterns $NeverDeployPatterns
+}
+
+function Test-AutoDeployExcludedPath {
+    param([string]$Path)
+
+    return (Test-ExcludedPath $Path) -or
+        (Test-PathMatchesAnyPattern -Path $Path -Patterns $AutoDeployExcludePatterns)
+}
+
+function Get-RepositoryFiles {
+    $gitCommand = Get-Command git -ErrorAction SilentlyContinue
+    if (-not $gitCommand) {
+        throw "Git is required to discover deployable project files."
+    }
+
+    $gitFiles = & git -C $PSScriptRoot ls-files --cached --others --exclude-standard
+    if ($LASTEXITCODE -ne 0) {
+        throw "Could not list repository files with git ls-files."
+    }
+
+    return @(
+        $gitFiles |
+            ForEach-Object { $_ -replace '\\', '/' } |
+            Where-Object {
+                $_ -and
+                (Test-Path -LiteralPath (Join-Path $PSScriptRoot $_) -PathType Leaf) -and
+                -not (Test-AutoDeployExcludedPath $_)
+            } |
+            Sort-Object -Unique
+    )
+}
+
+function Get-PresetFiles {
+    param([string]$Name)
+
+    switch ($Name) {
+        "all" { return @($ALL_FILES) }
+        "backend" {
+            return @($ALL_FILES | Where-Object {
+                $_ -like "backend/*" -or $_ -in @("app.py", "run.py", "passenger_wsgi.py")
+            })
+        }
+        "frontend" { return @($ALL_FILES | Where-Object { $_ -like "frontend/*" }) }
+        "python" { return @($ALL_FILES | Where-Object { $_ -like "*.py" }) }
+        "dependencies" { return @("pyproject.toml", "uv.lock") }
+        "csv" { return @("backend/data/program_titles.csv") }
+        "static" { return @($ALL_FILES | Where-Object { $_ -like "frontend/static/*" }) }
+        "config" { return @("backend/config.py") }
+        default { return $null }
+    }
+}
+
+$ALL_FILES = @(Get-RepositoryFiles)
+if ($ALL_FILES.Count -eq 0) {
+    throw "No deployable files were discovered."
+}
+$BuiltInPresetNames = @(
+    "all", "backend", "frontend", "python",
+    "dependencies", "csv", "static", "config"
+)
+
+function Test-PresetExists {
+    param([string]$Name)
+
+    if ($Name -in $BuiltInPresetNames) { return $true }
+    return (
+        (Get-Variable -Name CUSTOM_DEPLOY_PRESETS -ErrorAction SilentlyContinue) -and
+        $CUSTOM_DEPLOY_PRESETS.ContainsKey($Name)
+    )
+}
+
+function Resolve-PresetFiles {
+    param([string]$Name)
+
+    if ($Name -in $BuiltInPresetNames) { return @(Get-PresetFiles $Name) }
+    return @($CUSTOM_DEPLOY_PRESETS[$Name])
+}
+
+function ConvertTo-ShellLiteral {
+    param([string]$Value)
+
+    $escaped = $Value.Replace("'", "'`"'`"'")
+    return "'$escaped'"
 }
 
 function Test-DependencyFilesIncluded {
@@ -132,21 +262,15 @@ function Find-ProjectFile {
 }
 
 # ── Detect changed files ─────────────────────────────────────
-# Compares MD5 hashes of all files in $ALL_FILES between local and remote.
+# Compares MD5 hashes of all automatically discovered deployable files.
 # Returns list of files that are new or have changed content.
 function Get-ChangedFiles {
     Write-Host ""
     Write-Host "Checking for changes against server..." -ForegroundColor DarkGray
 
-    # Construct remote file list for md5sum
-    # Use relative paths to avoid massive command lines if possible, but here we use absolute for safety
-    # $remoteCheckList = ($ALL_FILES | ForEach-Object { "${REMOTE_APP_DIR}/$_" }) -join " "
-
-    # Improved Bash command:
-    # 1. cd to app dir
-    # 2. run md5sum on each file
-    # 3. output format: HASH  FILENAME
-    $remoteCmd = "cd ${REMOTE_APP_DIR} && md5sum $ALL_FILES 2>/dev/null"
+    $remoteDirectory = ConvertTo-ShellLiteral $REMOTE_APP_DIR
+    $remoteFiles = ($ALL_FILES | ForEach-Object { ConvertTo-ShellLiteral $_ }) -join " "
+    $remoteCmd = "cd -- $remoteDirectory && md5sum -- $remoteFiles 2>/dev/null || true"
     
     $SshArgs = Get-SshArgs
     $remoteOutput = ssh @SshArgs "$SERVER_USER@$SERVER_HOST" $remoteCmd
@@ -259,7 +383,7 @@ function Show-Menu {
     Write-Host "  Select what to deploy:" -ForegroundColor White
     Write-Host ""
     Write-Host "  [0] changed   - only files changed vs server (DEFAULT)" -ForegroundColor Cyan
-    Write-Host "  [1] all       - everything (backend + frontend)" -ForegroundColor Yellow
+    Write-Host "  [1] all       - all deployable Git files (automatic)" -ForegroundColor Yellow
     Write-Host "  [2] backend   - app.py, run.py, backend/" -ForegroundColor Yellow
     Write-Host "  [3] frontend  - frontend/" -ForegroundColor Yellow
     Write-Host "  [4] python    - .py files only" -ForegroundColor Yellow
@@ -309,12 +433,16 @@ if ($Files.Count -gt 0) {
     if ($Preset -eq "changed") {
         $itemsToSend = @(Get-ChangedFiles)
         $selectedPreset = "changed"
-    } elseif (-not $PRESETS.ContainsKey($Preset)) {
+    } elseif (-not (Test-PresetExists $Preset)) {
         Write-Host "[ERROR] Unknown preset: $Preset" -ForegroundColor Red
-        Write-Host "Available: changed, $($PRESETS.Keys -join ', ')" -ForegroundColor Yellow
+        $availablePresets = @($BuiltInPresetNames)
+        if (Get-Variable -Name CUSTOM_DEPLOY_PRESETS -ErrorAction SilentlyContinue) {
+            $availablePresets += @($CUSTOM_DEPLOY_PRESETS.Keys)
+        }
+        Write-Host "Available: changed, $($availablePresets -join ', ')" -ForegroundColor Yellow
         exit 1
     } else {
-        $itemsToSend = $PRESETS[$Preset]
+        $itemsToSend = @(Resolve-PresetFiles $Preset)
         $selectedPreset = $Preset
     }
 } else {
@@ -359,11 +487,24 @@ if ($Files.Count -gt 0) {
         # Remove duplicates
         $itemsToSend = $resolvedFiles | Select-Object -Unique
     } elseif ($selectedPreset -ne "changed") {
-        $itemsToSend = $PRESETS[$selectedPreset]
+        $itemsToSend = @(Resolve-PresetFiles $selectedPreset)
     }
 }
 
 # Nothing to send?
+$itemsToSend = @(
+    $itemsToSend |
+        ForEach-Object { ($_ -replace '\\', '/') -replace '^\./', '' } |
+        Where-Object {
+            if (Test-ExcludedPath $_) {
+                Write-Host "  [SKIP] Protected path: $_" -ForegroundColor DarkGray
+                return $false
+            }
+            return $true
+        } |
+        Select-Object -Unique
+)
+
 if ($itemsToSend.Count -eq 0) {
     Write-Host ""
     Write-Host "No files to deploy!" -ForegroundColor Yellow
@@ -376,6 +517,11 @@ Write-Host "Target: $SERVER_USER@$SERVER_HOST -> $REMOTE_APP_DIR" -ForegroundCol
 Write-Host "Files to send ($($itemsToSend.Count)):" -ForegroundColor White
 $itemsToSend | ForEach-Object { Write-Host "  - $_" -ForegroundColor DarkCyan }
 Write-Host ""
+
+if ($DryRun) {
+    Write-Host "Dry run complete - no files were uploaded and the application was not restarted." -ForegroundColor Green
+    exit 0
+}
 
 $confirm = Read-Host "Continue? [Y/n]"
 if ($confirm -ne "" -and $confirm.ToUpper() -ne "Y") {
@@ -395,21 +541,29 @@ if ($script:UploadFailed) {
     exit 1
 }
 
-# Synchronize production dependencies when dependency metadata was uploaded.
-if (Test-DependencyFilesIncluded -Items $itemsToSend) {
-    Write-Host ""
-    Write-Host "Synchronizing production dependencies on server..." -ForegroundColor White
+# Always synchronize and validate the project environment before restart.
+# uv sync is exact and idempotent, so a no-op deployment stays inexpensive,
+# while a stale or ABI-incompatible .venv is repaired before Passenger sees it.
+Write-Host ""
+Write-Host "Synchronizing and validating the production environment..." -ForegroundColor White
 
-    $SyncCommand = "cd `"${REMOTE_APP_DIR}`" && uv sync --frozen --no-dev"
-    $SshArgs = Get-SshArgs
-    $SshArgs += @("$SERVER_USER@$SERVER_HOST", $SyncCommand)
-    ssh @SshArgs
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "Dependency synchronization failed; application was not restarted." -ForegroundColor Red
-        exit 1
-    }
-    Write-Host "Dependencies synchronized successfully." -ForegroundColor Green
+$remoteDirectory = ConvertTo-ShellLiteral $REMOTE_APP_DIR
+$SyncCommand = @"
+cd -- $remoteDirectory &&
+uv sync --locked --no-dev &&
+EXPECTED_PYTHON=`$(tr -d '[:space:]' < .python-version) &&
+ACTUAL_PYTHON=`$(.venv/bin/python -c 'import sys; print(sys.version_info.major,sys.version_info.minor,sep=chr(46))') &&
+test "`$ACTUAL_PYTHON" = "`$EXPECTED_PYTHON" &&
+.venv/bin/python -c 'from lxml import etree; from app import create_app; create_app()'
+"@
+$SshArgs = Get-SshArgs
+$SshArgs += @("$SERVER_USER@$SERVER_HOST", $SyncCommand)
+ssh @SshArgs
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Environment synchronization or startup preflight failed; application was not restarted." -ForegroundColor Red
+    exit 1
 }
+Write-Host "Production environment validated successfully." -ForegroundColor Green
 
 # Trigger a Phusion Passenger restart.
 if (-not $NoRestart -and $RESTART_COMMAND -ne "") {

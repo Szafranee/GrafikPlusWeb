@@ -10,6 +10,7 @@
 #    ./deploy.sh --files "app.py,pyproject.toml"  -> specific files
 #    ./deploy.sh --preset dependencies -> dependencies + remote uv sync
 #    ./deploy.sh --preset backend --no-restart      -> skip restart
+#    ./deploy.sh --preset all --dry-run              -> preview without upload
 # ============================================================
 
 set -euo pipefail
@@ -31,24 +32,135 @@ if [[ "$SERVER_HOST" == "your-server.com" || "$SERVER_USER" == "user" ]]; then
     exit 1
 fi
 
-# ── Tracked files and presets are defined in deploy.config.sh ──
-
 # ── SSH/SCP helper ───────────────────────────────────────────
 # Usage: build_ssh_args; then use "${SSH_ARGS[@]}"
 #        build_scp_args; then use "${SCP_ARGS[@]}"
 build_ssh_args() {
-    SSH_ARGS=(-p "$SERVER_PORT" -o StrictHostKeyChecking=no)
+    SSH_ARGS=(-p "$SERVER_PORT" -o "StrictHostKeyChecking=${SSH_HOST_KEY_POLICY:-accept-new}")
     if [[ -n "$SSH_KEY" ]]; then SSH_ARGS+=(-i "$SSH_KEY"); fi
 }
 
 build_scp_args() {
-    SCP_ARGS=(-P "$SERVER_PORT" -o StrictHostKeyChecking=no)
+    SCP_ARGS=(-P "$SERVER_PORT" -o "StrictHostKeyChecking=${SSH_HOST_KEY_POLICY:-accept-new}")
     if [[ -n "$SSH_KEY" ]]; then SCP_ARGS+=(-i "$SSH_KEY"); fi
 }
 
+DEFAULT_NEVER_DEPLOY_PATTERNS=(
+    ".git" ".git/*" "*/.git" "*/.git/*"
+    ".env" ".env.*" "*/.env" "*/.env.*"
+    "deploy.config.ps1" "deploy.config.sh"
+    "instance" "instance/*" "*/instance" "*/instance/*"
+    ".venv" ".venv/*" "*/.venv" "*/.venv/*"
+    ".uv" ".uv/*" "*/.uv" "*/.uv/*"
+    "venv" "venv/*" "*/venv" "*/venv/*"
+    "env" "env/*" "*/env" "*/env/*"
+    "__pycache__" "*/__pycache__" "*/__pycache__/*"
+    ".pytest_cache" ".pytest_cache/*"
+    "*.pyc" "*.pyo" "*.log"
+)
+
+DEFAULT_AUTO_DEPLOY_EXCLUDE_PATTERNS=(
+    ".github" ".github/*" ".idea" ".idea/*"
+    "tests" "tests/*" "docs" "docs/*"
+    "README*" "LICENSE" "DEPLOYMENT.md" ".gitignore"
+    ".env.example"
+    "deploy.ps1" "deploy.sh"
+    "deploy.config.ps1.example" "deploy.config.sh.example"
+    "backend/data/program_titles.csv"
+)
+
+NEVER_DEPLOY_PATTERNS=("${DEFAULT_NEVER_DEPLOY_PATTERNS[@]}")
+if declare -p EXTRA_NEVER_DEPLOY_PATTERNS >/dev/null 2>&1; then
+    NEVER_DEPLOY_PATTERNS+=("${EXTRA_NEVER_DEPLOY_PATTERNS[@]}")
+fi
+
+AUTO_DEPLOY_EXCLUDE_PATTERNS=("${DEFAULT_AUTO_DEPLOY_EXCLUDE_PATTERNS[@]}")
+if declare -p EXTRA_AUTO_DEPLOY_EXCLUDE_PATTERNS >/dev/null 2>&1; then
+    AUTO_DEPLOY_EXCLUDE_PATTERNS+=("${EXTRA_AUTO_DEPLOY_EXCLUDE_PATTERNS[@]}")
+fi
+
+path_matches_patterns() {
+    local normalized="${1#./}" pattern
+    normalized="${normalized//\\//}"
+    normalized="${normalized%/}"
+    shift
+    for pattern in "$@"; do
+        if [[ $normalized == $pattern ]]; then return 0; fi
+    done
+    return 1
+}
+
 is_excluded_path() {
-    local path="/${1//\\//}/"
-    [[ "$path" == */.venv/* || "$path" == */.uv/* || "$path" == */__pycache__/* ]]
+    path_matches_patterns "$1" "${NEVER_DEPLOY_PATTERNS[@]}"
+}
+
+is_auto_deploy_excluded_path() {
+    is_excluded_path "$1" ||
+        path_matches_patterns "$1" "${AUTO_DEPLOY_EXCLUDE_PATTERNS[@]}"
+}
+
+discover_repository_files() {
+    command -v git >/dev/null 2>&1 || {
+        echo "[ERROR] Git is required to discover deployable project files." >&2
+        return 1
+    }
+
+    local path
+    while IFS= read -r path; do
+        [[ -f "$SCRIPT_DIR/$path" ]] || continue
+        is_auto_deploy_excluded_path "$path" && continue
+        printf '%s\n' "$path"
+    done < <(git -C "$SCRIPT_DIR" ls-files --cached --others --exclude-standard)
+}
+
+command -v git >/dev/null 2>&1 || {
+    echo "[ERROR] Git is required to discover deployable project files."
+    exit 1
+}
+mapfile -t ALL_FILES < <(discover_repository_files)
+if [[ ${#ALL_FILES[@]} -eq 0 ]]; then
+    echo "[ERROR] No deployable files were discovered."
+    exit 1
+fi
+
+BUILT_IN_PRESETS=(all backend frontend python dependencies csv static config)
+
+preset_exists() {
+    local name="$1" preset
+    for preset in "${BUILT_IN_PRESETS[@]}"; do
+        [[ "$name" == "$preset" ]] && return 0
+    done
+    declare -p CUSTOM_DEPLOY_PRESETS >/dev/null 2>&1 &&
+        [[ -n "${CUSTOM_DEPLOY_PRESETS[$name]+defined}" ]]
+}
+
+get_preset_files() {
+    local name="$1" file
+    case "$name" in
+        all) printf '%s\n' "${ALL_FILES[@]}" ;;
+        backend)
+            for file in "${ALL_FILES[@]}"; do
+                [[ "$file" == backend/* || "$file" == "app.py" || "$file" == "run.py" || "$file" == "passenger_wsgi.py" ]] && printf '%s\n' "$file"
+            done
+            ;;
+        frontend)
+            for file in "${ALL_FILES[@]}"; do [[ "$file" == frontend/* ]] && printf '%s\n' "$file"; done
+            ;;
+        python)
+            for file in "${ALL_FILES[@]}"; do [[ "$file" == *.py ]] && printf '%s\n' "$file"; done
+            ;;
+        dependencies) printf '%s\n' "pyproject.toml" "uv.lock" ;;
+        csv) printf '%s\n' "backend/data/program_titles.csv" ;;
+        static)
+            for file in "${ALL_FILES[@]}"; do [[ "$file" == frontend/static/* ]] && printf '%s\n' "$file"; done
+            ;;
+        config) printf '%s\n' "backend/config.py" ;;
+        *)
+            local -a custom_files
+            read -ra custom_files <<< "${CUSTOM_DEPLOY_PRESETS[$name]}"
+            printf '%s\n' "${custom_files[@]}"
+            ;;
+    esac
 }
 
 selection_includes_dependencies() {
@@ -92,14 +204,18 @@ find_project_file() {
 }
 
 # ── Detect changed files ─────────────────────────────────────
-# Compares MD5 hashes of all files in ALL_FILES between local and remote.
+# Compares MD5 hashes of all automatically discovered deployable files.
 # Prints files that are new or have changed content.
 get_changed_files() {
     echo "" >&2
     echo "Checking for changes against server..." >&2
 
-    # Build remote file list as space-separated string
-    local remote_files_str="${ALL_FILES[*]}"
+    local remote_files_str="" quoted_file quoted_remote_dir file
+    for file in "${ALL_FILES[@]}"; do
+        printf -v quoted_file '%q' "$file"
+        remote_files_str+=" $quoted_file"
+    done
+    printf -v quoted_remote_dir '%q' "$REMOTE_APP_DIR"
 
     build_ssh_args
 
@@ -107,7 +223,7 @@ get_changed_files() {
     # We cd into the remote dir first so md5sum outputs relative paths cleanly.
     local remote_output
     remote_output="$(ssh "${SSH_ARGS[@]}" "$SERVER_USER@$SERVER_HOST" \
-        "cd \"$REMOTE_APP_DIR\" && md5sum $remote_files_str 2>/dev/null || true")"
+        "cd -- $quoted_remote_dir && md5sum -- $remote_files_str 2>/dev/null || true")"
 
     # Build associative array: relative_path -> hash
     declare -A remote_hashes
@@ -116,7 +232,7 @@ get_changed_files() {
         local hash rel_path
         # Output format: HASH  filename
         hash="${line%% *}"
-        rel_path="${line##* }"
+        rel_path="${line#*  }"
         # Clean up ./ prefix if present (md5sum sometimes adds it)
         rel_path="${rel_path#./}"
 
@@ -208,7 +324,7 @@ show_menu() {
         echo "  Select what to deploy:"
         echo ""
         echo "  [0] changed   - only files changed vs server (DEFAULT)"
-        echo "  [1] all       - everything (backend + frontend)"
+        echo "  [1] all       - all deployable Git files (automatic)"
         echo "  [2] backend   - app.py, run.py, backend/"
         echo "  [3] frontend  - frontend/"
         echo "  [4] python    - .py files only"
@@ -247,12 +363,14 @@ show_menu() {
 PRESET=""
 FILES_ARG=""
 NO_RESTART=false
+DRY_RUN=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --preset)     PRESET="$2";    shift 2 ;;
         --files)      FILES_ARG="$2"; shift 2 ;;
         --no-restart) NO_RESTART=true; shift ;;
+        --dry-run)    DRY_RUN=true; shift ;;
         *) echo "[ERROR] Unknown argument: $1"; exit 1 ;;
     esac
 done
@@ -271,12 +389,12 @@ elif [[ -n "$PRESET" ]]; then
     if [[ "$PRESET" == "changed" ]]; then
         mapfile -t items_to_send < <(get_changed_files)
         selected_preset="changed"
-    elif [[ -z "${PRESETS[$PRESET]+_}" ]]; then
+    elif ! preset_exists "$PRESET"; then
         echo "[ERROR] Unknown preset: $PRESET"
-        echo "Available: changed, ${!PRESETS[*]}"
+        echo "Available: changed, ${BUILT_IN_PRESETS[*]}"
         exit 1
     else
-        read -ra items_to_send <<< "${PRESETS[$PRESET]}"
+        mapfile -t items_to_send < <(get_preset_files "$PRESET")
         selected_preset="$PRESET"
     fi
 else
@@ -310,9 +428,26 @@ else
         # Convert keys back to array
         items_to_send=("${!unique_files[@]}")
     else
-        read -ra items_to_send <<< "${PRESETS[$selected_preset]}"
+        mapfile -t items_to_send < <(get_preset_files "$selected_preset")
     fi
 fi
+
+# Remove duplicates and enforce non-bypassable protection before showing the summary.
+declare -A unique_selected_items=()
+filtered_items=()
+for item in "${items_to_send[@]}"; do
+    item="${item#./}"
+    item="${item//\\//}"
+    if is_excluded_path "$item"; then
+        echo "  [SKIP] Protected path: $item"
+        continue
+    fi
+    if [[ -z "${unique_selected_items[$item]+defined}" ]]; then
+        unique_selected_items["$item"]=1
+        filtered_items+=("$item")
+    fi
+done
+items_to_send=("${filtered_items[@]}")
 
 # Nothing to send?
 if [[ ${#items_to_send[@]} -eq 0 ]]; then
@@ -330,6 +465,11 @@ for item in "${items_to_send[@]}"; do
 done
 echo ""
 
+if [[ "$DRY_RUN" == true ]]; then
+    echo "Dry run complete - no files were uploaded and the application was not restarted."
+    exit 0
+fi
+
 read -rp "Continue? [Y/n] " confirm
 confirm="${confirm:-Y}"
 if [[ "${confirm^^}" != "Y" ]]; then
@@ -344,18 +484,23 @@ for item in "${items_to_send[@]}"; do
     send_item "$item"
 done
 
-# Synchronize production dependencies when dependency metadata was uploaded.
-if selection_includes_dependencies "${items_to_send[@]}"; then
-    echo ""
-    echo "Synchronizing production dependencies on server..."
-    build_ssh_args
-    if ssh "${SSH_ARGS[@]}" "$SERVER_USER@$SERVER_HOST" \
-        "cd ${REMOTE_APP_DIR@Q} && uv sync --frozen --no-dev"; then
-        echo "Dependencies synchronized successfully."
-    else
-        echo "Dependency synchronization failed; application was not restarted."
-        exit 1
-    fi
+# Always synchronize and validate the project environment before restart.
+# uv sync is exact and idempotent, and catches stale/broken binary extensions.
+echo ""
+echo "Synchronizing and validating the production environment..."
+build_ssh_args
+printf -v quoted_remote_dir '%q' "$REMOTE_APP_DIR"
+preflight_command="cd -- $quoted_remote_dir && \
+uv sync --locked --no-dev && \
+EXPECTED_PYTHON=\$(tr -d '[:space:]' < .python-version) && \
+ACTUAL_PYTHON=\$(.venv/bin/python -c 'import sys; print(sys.version_info.major,sys.version_info.minor,sep=chr(46))') && \
+test \"\$ACTUAL_PYTHON\" = \"\$EXPECTED_PYTHON\" && \
+.venv/bin/python -c 'from lxml import etree; from app import create_app; create_app()'"
+if ssh "${SSH_ARGS[@]}" "$SERVER_USER@$SERVER_HOST" "$preflight_command"; then
+    echo "Production environment validated successfully."
+else
+    echo "Environment synchronization or startup preflight failed; application was not restarted."
+    exit 1
 fi
 
 # Trigger a Phusion Passenger restart.

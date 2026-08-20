@@ -67,7 +67,7 @@ A web-based version of [GrafikPlus](https://github.com/Szafranee/GrafikPlus) - a
 ## 🧪 Development
 
 ### Prerequisites
-- Python 3.13 or newer
+- Python 3.12 (the version used by the production Passenger application)
 - Git
 - [uv](https://docs.astral.sh/uv/getting-started/installation/)
 
