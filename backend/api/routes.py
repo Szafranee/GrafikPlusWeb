@@ -1,7 +1,8 @@
-from io import BytesIO
 from pathlib import Path
+from urllib.parse import quote
+import unicodedata
 
-from flask import Blueprint, request, jsonify, send_file, current_app
+from flask import Blueprint, request, jsonify, current_app
 from backend.config import DEFAULT_INSTALLATION_FILENAME, ScheduleConfig
 from backend.reporting import (
     POLISH_MONTHS,
@@ -15,6 +16,28 @@ import os
 import shutil
 
 api_blueprint = Blueprint('api', __name__)
+
+XLSX_MIMETYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+
+
+def _xlsx_download_response(file_data: bytes, filename: str):
+    """Return XLSX bytes without invoking the server's file-wrapper extension."""
+    safe_filename = filename.replace('\r', '').replace('\n', '')
+    ascii_filename = (
+        unicodedata.normalize('NFKD', safe_filename)
+        .encode('ascii', 'ignore')
+        .decode('ascii')
+        .replace('\\', '_')
+        .replace('"', '_')
+    ) or DEFAULT_INSTALLATION_FILENAME
+    disposition = f'attachment; filename="{ascii_filename}"'
+    if ascii_filename != safe_filename:
+        encoded_filename = quote(safe_filename, safe='!#$&+-.^_`|~')
+        disposition += f"; filename*=UTF-8''{encoded_filename}"
+
+    response = current_app.response_class(file_data, mimetype=XLSX_MIMETYPE)
+    response.headers['Content-Disposition'] = disposition
+    return response
 
 @api_blueprint.route('/health', methods=['GET'])
 def health_check():
@@ -86,12 +109,7 @@ def get_schedule():
 
             # Return file and ensure it's closed after sending
             file_data = Path(file_path).read_bytes()
-            return send_file(
-                BytesIO(file_data),
-                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                as_attachment=True,
-                download_name=download_filename
-            )
+            return _xlsx_download_response(file_data, download_filename)
 
         except Exception as e:
             # Handle scraper specific errors

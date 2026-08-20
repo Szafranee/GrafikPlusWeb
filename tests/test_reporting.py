@@ -190,6 +190,22 @@ class ReportingTests(unittest.TestCase):
             self.assertTrue(
                 all(cell.style_id == 0 for row in worksheet.iter_rows() for cell in row)
             )
+            self.assertEqual(
+                worksheet.column_dimensions["A"].width,
+                len("18.05.2026") + 2,
+            )
+            self.assertEqual(
+                worksheet.column_dimensions["B"].width,
+                len("Tytuł programu") + 2,
+            )
+            self.assertEqual(
+                worksheet.column_dimensions["C"].width,
+                len("Mecz testowy") + 2,
+            )
+            self.assertEqual(
+                worksheet.column_dimensions["H"].width,
+                len("Jan Kowalski") + 2,
+            )
             workbook.close()
 
     @staticmethod

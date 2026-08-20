@@ -52,6 +52,10 @@ class AdminTests(unittest.TestCase):
         self.assertIsInstance(config["year"], int)
 
     def test_schedule_response_uses_generated_report_filename(self):
+        class PassengerFileWrapper:
+            def __init__(self, file_like, *_args):
+                file_like.fileno()
+
         class FakeScraper:
             def __init__(self, config):
                 self.config = config
@@ -77,6 +81,7 @@ class AdminTests(unittest.TestCase):
                     "endDate": "2026-05-18",
                     "isPersonal": True,
                 },
+                environ_overrides={"wsgi.file_wrapper": PassengerFileWrapper},
             )
 
         self.assertEqual(response.status_code, 200)

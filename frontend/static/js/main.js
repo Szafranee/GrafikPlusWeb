@@ -156,6 +156,22 @@ document.addEventListener('alpine:init', () => {
             return plain ? plain[1] : this.defaultInstallationFilename;
         },
 
+        async getErrorMessage(response) {
+            const fallback = response.status >= 500
+                ? 'Serwer nie mógł wygenerować pliku. Spróbuj ponownie lub skontaktuj się z administratorem.'
+                : `Żądanie nie powiodło się (HTTP ${response.status}).`;
+            const contentType = response.headers.get('Content-Type') || '';
+            if (!contentType.toLowerCase().includes('application/json')) {
+                return fallback;
+            }
+            try {
+                const errorData = await response.json();
+                return errorData.message || fallback;
+            } catch (_) {
+                return fallback;
+            }
+        },
+
         async submitForm() {
             try {
                 // Save username to localStorage
@@ -181,8 +197,7 @@ document.addEventListener('alpine:init', () => {
                 });
 
                 if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || 'Wystąpił błąd');
+                    throw new Error(await this.getErrorMessage(response));
                 }
 
                 const blob = await response.blob();
