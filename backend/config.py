@@ -1,7 +1,8 @@
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from backend.program_titles import ProgramTitles
+from backend.reporting import template_export_enabled
 
 @dataclass
 class ScheduleConfig:
@@ -17,6 +18,7 @@ class ScheduleConfig:
     start_date: str
     end_date: str
     is_personal: bool
+    use_template_export: bool = field(default_factory=template_export_enabled)
 
     # Program titles file
     program_titles_csv: str = os.path.join(os.path.dirname(__file__), "data", "program_titles.csv")

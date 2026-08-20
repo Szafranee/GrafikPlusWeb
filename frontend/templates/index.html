@@ -20,6 +20,12 @@
     <img class="logo logo-light" alt="GrafikPlusWeb Banner" src="https://github.com/Szafranee/GrafikPlusWeb/blob/main/docs/images/GrafikPlus_text_black.png?raw=true"/>
     <img class="logo logo-dark" alt="GrafikPlusWeb Banner Dark" src="https://github.com/Szafranee/GrafikPlusWeb/blob/main/docs/images/GrafikPlus_text_white.png?raw=true"/>
 
+    <a href="/admin/" class="admin-link" aria-label="Panel administratora" title="Panel administratora">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M19.43 12.98c.04-.32.07-.65.07-.98s-.03-.66-.07-.98l2.11-1.65a.5.5 0 0 0 .12-.64l-2-3.46a.5.5 0 0 0-.6-.22l-2.49 1a7.47 7.47 0 0 0-1.69-.98l-.38-2.65A.5.5 0 0 0 14 2h-4a.5.5 0 0 0-.5.42l-.38 2.65c-.61.25-1.18.58-1.69.98l-2.49-1a.5.5 0 0 0-.6.22l-2 3.46a.5.5 0 0 0 .12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65a.5.5 0 0 0-.12.64l2 3.46a.5.5 0 0 0 .6.22l2.49-1c.51.4 1.08.73 1.69.98l.38 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.38-2.65c.61-.25 1.18-.58 1.69-.98l2.49 1c.23.09.48 0 .6-.22l2-3.46a.5.5 0 0 0-.12-.64l-2.11-1.65ZM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z"/>
+        </svg>
+    </a>
+
     <!-- Theme Toggle -->
     <button @click="toggleTheme()" class="theme-toggle" aria-label="Zmień motyw" tabindex="0"></button>
 
@@ -29,7 +35,7 @@
             <div class="section-header">Dane logowania</div>
             <div class="form-group">
                 <label for="username">Login:</label>
-                <input type="text" id="username" x-model="username" required>
+                <input type="text" id="username" x-model="username" @input="updateFilenamePreview" required>
             </div>
 
             <div class="form-group">
@@ -77,12 +83,44 @@
             </div>
         </div>
 
-        <!-- Output Section -->
+        <!-- Output filename -->
         <div class="section">
             <div class="section-header">Plik wyjściowy</div>
             <div class="form-group">
                 <label for="filename">Nazwa pliku:</label>
-                <input type="text" id="filename" x-model="filename" placeholder="grafik.xlsx" required>
+                <div class="filename-control">
+                    <input type="text"
+                           id="filename"
+                           x-model="filename"
+                           :disabled="filenameLocked"
+                           placeholder="grafik.xlsx"
+                           required>
+                    <button type="button"
+                            class="filename-lock-toggle"
+                            x-show="templateExportEnabled"
+                            :class="{ 'is-active': filenameLocked }"
+                            :aria-pressed="filenameLocked"
+                            @click="toggleFilenameLock"
+                            :aria-label="filenameLocked ? 'Odblokuj własną nazwę pliku' : 'Przywróć automatyczną nazwę pliku'"
+                            :title="filenameLocked ? 'Odblokuj własną nazwę' : 'Przywróć automatyczną nazwę'">
+                        <svg x-show="filenameLocked" viewBox="0 0 24 24" aria-hidden="true">
+                            <rect x="5" y="10" width="14" height="11" rx="2"/>
+                            <path d="M8 10V7a4 4 0 0 1 8 0v3"/>
+                            <circle cx="12" cy="15" r="1"/>
+                            <path d="M12 16v2"/>
+                        </svg>
+                        <svg x-show="!filenameLocked" x-cloak viewBox="0 0 24 24" aria-hidden="true">
+                            <rect x="5" y="10" width="14" height="11" rx="2"/>
+                            <path d="M8 10V7.5a4.5 4.5 0 0 1 8.7-1.65"/>
+                            <circle cx="12" cy="15" r="1"/>
+                            <path d="M12 16v2"/>
+                        </svg>
+                    </button>
+                </div>
+                <p class="filename-hint" x-show="templateExportEnabled">
+                    <span x-show="filenameLocked">Nazwa jest tworzona automatycznie. Kliknij kłódkę, aby ją zmienić.</span>
+                    <span x-show="!filenameLocked" x-cloak>Własna nazwa jest włączona. Kliknij otwartą kłódkę, aby wrócić do podglądu.</span>
+                </p>
             </div>
         </div>
 

@@ -1,12 +1,15 @@
 from flask import Flask, render_template
 from flask_cors import CORS
+from dotenv import load_dotenv
 from backend.api.routes import api_blueprint
+from backend.admin import admin_blueprint
 import os
 from pathlib import Path
 
 def create_app():
     # Path to the base directory
     base_dir = Path(__file__).parent
+    load_dotenv(base_dir / '.env')
 
     app = Flask(__name__,
                 static_folder=str(base_dir / 'frontend/static'),
@@ -21,7 +24,8 @@ def create_app():
         DEBUG=False,
         TESTING=False,
         SECRET_KEY=os.environ.get('SECRET_KEY', 'dev-key-change-in-production'),
-        PREFERRED_URL_SCHEME='https'
+        PREFERRED_URL_SCHEME='https',
+        MAX_CONTENT_LENGTH=32 * 1024 * 1024
     )
 
     # Basic configuration
@@ -35,5 +39,6 @@ def create_app():
             return f"Error loading template: {str(e)}"
 
     app.register_blueprint(api_blueprint, url_prefix='/api')
+    app.register_blueprint(admin_blueprint, url_prefix='/admin')
 
     return app

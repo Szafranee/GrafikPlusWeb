@@ -122,7 +122,7 @@ class ScheduleScraper:
             logging.error(f"Error fetching schedule for date {date}: {e}")
             return None
 
-    def scrape_schedule(self):
+    def scrape_schedule(self) -> str:
         """Main execution function"""
         if not self.__login():
             logging.error("Login failed")
@@ -162,7 +162,7 @@ class ScheduleScraper:
             # Create a new parser with the combined data
             combined_parser = ScheduleParser("", self.schedule_config)
             combined_parser.set_parsed_data(all_data)
-            combined_parser.save_to_xlsx()
+            download_filename = combined_parser.save_to_xlsx()
         except PermissionError as e:
             raise PermissionError({"title": e.args[0]["title"],
                                    "message": e.args[0]["message"]})
@@ -175,3 +175,5 @@ class ScheduleScraper:
             shutil.rmtree(temp_dir)
         except Exception as e:
             logging.warning(f"Failed to clean up temporary files: {e}")
+
+        return download_filename

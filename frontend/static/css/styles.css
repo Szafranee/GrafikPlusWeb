@@ -147,7 +147,9 @@ label {
 /* Input fields */
 input[type="text"],
 input[type="password"],
-input[type="date"] {
+input[type="date"],
+input[type="number"],
+input[type="file"] {
     width: 100%;
     padding: 10px;
     border: 2px solid var(--border-color);
@@ -246,6 +248,45 @@ input[type="date"] {
     overflow: hidden;
 }
 
+[x-cloak] {
+    display: none !important;
+}
+
+.admin-link {
+    position: absolute;
+    top: 15px;
+    right: 70px;
+    width: 40px;
+    height: 40px;
+    box-sizing: border-box;
+    border: 2px solid var(--border-color);
+    border-radius: 50%;
+    color: var(--text-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-speed);
+}
+
+.admin-link svg {
+    width: 21px;
+    height: 21px;
+    fill: currentColor;
+    transform-box: view-box;
+    transform-origin: center;
+    transition: transform var(--transition-speed);
+}
+
+.admin-link:hover {
+    color: var(--primary-color);
+    border-color: var(--primary-color);
+    transform: scale(1.1);
+}
+
+.admin-link:hover svg {
+    transform: rotate(20deg);
+}
+
 .theme-toggle:hover {
     transform: scale(1.1);
     border-color: var(--primary-color);
@@ -255,12 +296,17 @@ input[type="date"] {
 .theme-toggle::before {
     content: "☀️";
     position: absolute;
+    top: 50%;
+    left: 50%;
+    line-height: 1;
+    transform: translate(-50%, -50%) rotate(0deg);
+    transform-origin: center;
     transition: transform var(--transition-speed);
 }
 
 .dark .theme-toggle::before {
     content: "🌙";
-    transform: rotate(360deg);
+    transform: translate(-50%, -50%) rotate(360deg);
 }
 
 
@@ -335,9 +381,348 @@ button[type="submit"]:active {
         right: 10px;
     }
 
+    .admin-link {
+        top: 10px;
+        right: 60px;
+    }
+
     .radio-group {
         flex-direction: column;
         align-items: center;
         gap: 15px;
     }
+}
+
+/* Admin panel */
+.admin-page {
+    --primary-color: #7c3aed;
+    --primary-hover: #4c1d95;
+    background: linear-gradient(155deg, #f5f3ff, #c4b5fd 55%, #60a5fa) no-repeat fixed;
+}
+
+.admin-page.dark {
+    background: linear-gradient(155deg, #171225, #312e81 58%, #1e3a5f) no-repeat fixed;
+}
+
+.admin-container {
+    max-width: 920px;
+    padding: 24px 30px 30px;
+}
+
+.admin-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.admin-header h1 {
+    margin: 0;
+    font-size: clamp(27px, 5vw, 40px);
+}
+
+.admin-heading {
+    min-width: 0;
+}
+
+.admin-logo {
+    width: 120px;
+    margin: 0;
+}
+
+.admin-logo-link {
+    display: block;
+    width: fit-content;
+    margin-bottom: 7px;
+    border-radius: 5px;
+    transition: opacity var(--transition-speed), box-shadow var(--transition-speed);
+}
+
+.admin-logo-link:hover {
+    opacity: 0.72;
+}
+
+.admin-logo-link:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 55%, transparent);
+}
+
+.admin-actions {
+    display: flex;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.icon-link,
+.admin-theme-toggle {
+    position: relative;
+    inset: auto;
+    width: 42px;
+    height: 42px;
+    box-sizing: border-box;
+    border: 2px solid var(--border-color);
+    border-radius: 50%;
+    color: var(--text-color);
+    background: var(--background-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    font-size: 24px;
+    cursor: pointer;
+    transition: all var(--transition-speed);
+}
+
+.icon-link:hover,
+.admin-theme-toggle:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+    transform: scale(1.08);
+}
+
+.icon-link svg {
+    width: 29px;
+    height: 29px;
+    fill: currentColor;
+}
+
+.admin-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.admin-card {
+    padding: 18px;
+    margin-bottom: 14px;
+}
+
+.admin-card .section-header {
+    color: var(--primary-color);
+}
+
+.file-status {
+    min-height: 42px;
+    margin: 0 0 16px;
+    text-align: center;
+}
+
+.file-status span {
+    color: #777;
+    font-size: 13px;
+}
+
+.dark .file-status span {
+    color: #bbb;
+}
+
+.admin-status {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px 15px;
+    margin-bottom: 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--primary-color) 7%, var(--background-color));
+}
+
+.admin-status small {
+    margin-left: auto;
+    opacity: 0.72;
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.status-on {
+    background: var(--success-color);
+    box-shadow: 0 0 0 4px rgba(40, 167, 69, 0.14);
+}
+
+.status-off {
+    background: var(--warning-color);
+    box-shadow: 0 0 0 4px rgba(255, 193, 7, 0.14);
+}
+
+.admin-message {
+    padding: 12px 15px;
+    margin-bottom: 14px;
+    border-radius: 8px;
+    font-weight: 600;
+}
+
+.admin-message-success {
+    color: var(--success-color);
+    border: 1px solid var(--success-color);
+    background: rgba(40, 167, 69, 0.09);
+}
+
+.admin-message-error {
+    color: var(--error-color);
+    border: 1px solid var(--error-color);
+    background: rgba(220, 53, 69, 0.09);
+}
+
+.mapping-group + .mapping-group {
+    margin-top: 26px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border-color);
+}
+
+.mapping-group h2 {
+    margin: 0 0 14px;
+    color: var(--text-color);
+    font-size: 14px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.mapping-fields {
+    display: grid;
+    gap: 0 12px;
+}
+
+.mapping-fields .form-group {
+    margin-bottom: 0;
+}
+
+.mapping-fields-single {
+    grid-template-columns: minmax(180px, 420px);
+}
+
+.mapping-fields-two {
+    grid-template-columns: repeat(2, minmax(140px, 200px));
+}
+
+.mapping-fields-sheet-range {
+    grid-template-columns: minmax(190px, 2fr) repeat(2, minmax(140px, 1fr));
+    max-width: 700px;
+}
+
+.mapping-fields-three {
+    grid-template-columns: repeat(3, minmax(140px, 1fr));
+    max-width: 650px;
+}
+
+.mapping-fields-five {
+    grid-template-columns: repeat(5, minmax(105px, 1fr));
+}
+
+.mapping-groups + button[type="submit"] {
+    margin-top: 28px;
+}
+
+@media (max-width: 720px) {
+    .admin-container {
+        padding: 20px 15px;
+    }
+
+    .admin-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .mapping-fields-five {
+        grid-template-columns: repeat(2, minmax(140px, 1fr));
+        gap: 14px 12px;
+    }
+
+    .mapping-fields-three {
+        grid-template-columns: repeat(3, minmax(100px, 1fr));
+    }
+
+    .admin-status small {
+        width: 100%;
+        margin-left: 18px;
+    }
+}
+
+@media (max-width: 430px) {
+    .admin-header {
+        align-items: flex-start;
+    }
+
+    .mapping-fields,
+    .mapping-fields-two,
+    .mapping-fields-sheet-range,
+    .mapping-fields-three,
+    .mapping-fields-five {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+}
+
+.filename-control {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+}
+
+.filename-control input {
+    flex: 1;
+    min-width: 0;
+}
+
+.filename-control input:disabled {
+    color: color-mix(in srgb, var(--text-color) 48%, transparent);
+    background: color-mix(in srgb, #8b8b8b 34%, var(--background-color));
+    border-color: color-mix(in srgb, #777 62%, var(--border-color));
+    box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.14);
+    cursor: not-allowed;
+    opacity: 1;
+}
+
+.filename-lock-toggle {
+    width: 46px;
+    min-width: 46px;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-color);
+    background: var(--background-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all var(--transition-speed);
+}
+
+.filename-lock-toggle:hover {
+    color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.filename-lock-toggle.is-active {
+    color: #fff;
+    border-color: var(--primary-color);
+    background: var(--primary-color);
+    box-shadow: inset 0 3px 7px rgba(0, 0, 0, 0.28);
+    transform: translateY(1px);
+}
+
+.filename-lock-toggle.is-active:hover {
+    color: #fff;
+    background: var(--primary-hover);
+    border-color: var(--primary-hover);
+}
+
+.filename-lock-toggle svg {
+    width: 26px;
+    height: 26px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.filename-hint {
+    margin: 7px 2px 0;
+    color: color-mix(in srgb, var(--text-color) 68%, transparent);
+    font-size: 12px;
+    line-height: 1.4;
 }

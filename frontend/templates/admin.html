@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel administratora — GrafikPlus</title>
+    <link rel="icon" type="image/x-icon" href="/static/img/favicon.ico">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="/static/js/main.js"></script>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body class="admin-page" x-data="themeHandler" :class="theme">
+<main class="container admin-container">
+    <header class="admin-header">
+        <div class="admin-heading">
+            <a href="/" class="admin-logo-link" aria-label="Wróć do strony głównej GrafikPlus" title="Wróć do strony głównej">
+                <img class="logo admin-logo logo-light" alt="GrafikPlus" src="https://github.com/Szafranee/GrafikPlusWeb/blob/main/docs/images/GrafikPlus_text_black.png?raw=true">
+                <img class="logo admin-logo logo-dark" alt="GrafikPlus" src="https://github.com/Szafranee/GrafikPlusWeb/blob/main/docs/images/GrafikPlus_text_white.png?raw=true">
+            </a>
+            <h1>Panel administratora</h1>
+        </div>
+        <div class="admin-actions">
+            <a href="/" class="icon-link" aria-label="Powrót do strony głównej" title="Powrót">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.42-1.41L7.83 13H20v-2Z"/>
+                </svg>
+            </a>
+            <button @click="toggleTheme()" class="theme-toggle admin-theme-toggle" aria-label="Zmień motyw"></button>
+        </div>
+    </header>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+            <div class="admin-message admin-message-{{ category }}">{{ message }}</div>
+        {% endfor %}
+    {% endwith %}
+
+    <section class="admin-status">
+        <span class="status-dot {{ 'status-on' if template_export_enabled else 'status-off' }}"></span>
+        Nowy eksport z szablonu jest {{ 'włączony' if template_export_enabled else 'wyłączony' }}.
+        <small>Zmienna środowiskowa: USE_TEMPLATE_EXPORT</small>
+    </section>
+
+    <div class="admin-grid">
+        <section class="section admin-card">
+            <div class="section-header">Szablon raportu</div>
+            <p class="file-status">
+                <strong>{{ template_details.name }}</strong><br>
+                <span>Ostatnia zmiana: {{ template_details.modified }}</span>
+            </p>
+            <form action="{{ url_for('admin.upload_template') }}" method="post" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="template">Nowy plik XLSX</label>
+                    <input type="file" id="template" name="template" accept=".xlsx" required>
+                </div>
+                <button type="submit">Wgraj szablon</button>
+            </form>
+        </section>
+
+        <section class="section admin-card">
+            <div class="section-header">Słownik tytułów</div>
+            <p class="file-status">
+                <strong>{{ csv_details.name }}</strong><br>
+                <span>Ostatnia zmiana: {{ csv_details.modified }}</span>
+            </p>
+            <form action="{{ url_for('admin.upload_program_titles') }}" method="post" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="program_titles">Nowy plik CSV (UTF-8, separator „;”)</label>
+                    <input type="file" id="program_titles" name="program_titles" accept=".csv,text/csv" required>
+                </div>
+                <button type="submit">Wgraj słownik</button>
+            </form>
+        </section>
+    </div>
+
+    <section class="section admin-card settings-card">
+        <div class="section-header">Mapowanie komórek raportu</div>
+        <form action="{{ url_for('admin.save_settings') }}" method="post">
+            <div class="mapping-groups">
+                <div class="mapping-group">
+                    <h2>Arkusz i zakres wierszy</h2>
+                    <div class="mapping-fields mapping-fields-sheet-range">
+                        <div class="form-group">
+                            <label for="worksheet">Arkusz docelowy</label>
+                            <input type="text" id="worksheet" name="worksheet" value="{{ settings.worksheet }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="start_row">Pierwszy wiersz</label>
+                            <input type="number" id="start_row" name="start_row" min="1" value="{{ settings.start_row }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="end_row">Ostatni wiersz</label>
+                            <input type="number" id="end_row" name="end_row" min="1" value="{{ settings.end_row }}" required>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mapping-group">
+                    <h2>Kolumny danych</h2>
+                    <div class="mapping-fields mapping-fields-five">
+                        <div class="form-group">
+                            <label for="date_column">Data</label>
+                            <input type="text" id="date_column" name="date_column" value="{{ settings.date_column }}" maxlength="3" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="program_title_column">Tytuł programu</label>
+                            <input type="text" id="program_title_column" name="program_title_column" value="{{ settings.program_title_column }}" maxlength="3" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="description_column">Opis</label>
+                            <input type="text" id="description_column" name="description_column" value="{{ settings.description_column }}" maxlength="3" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="activity_column">Czynność</label>
+                            <input type="text" id="activity_column" name="activity_column" value="{{ settings.activity_column }}" maxlength="3" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="hours_column">Liczba godzin</label>
+                            <input type="text" id="hours_column" name="hours_column" value="{{ settings.hours_column }}" maxlength="3" required>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mapping-group">
+                    <h2>Wartość czynności</h2>
+                    <div class="mapping-fields mapping-fields-single">
+                        <div class="form-group">
+                            <label for="activity_value">Wartość wpisywana do kolumny czynności</label>
+                            <input type="text" id="activity_value" name="activity_value" value="{{ settings.activity_value }}" required>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mapping-group">
+                    <h2>Komórki nagłówka</h2>
+                    <div class="mapping-fields mapping-fields-three">
+                        <div class="form-group">
+                            <label for="full_name_cell">Imię i nazwisko</label>
+                            <input type="text" id="full_name_cell" name="full_name_cell" value="{{ settings.full_name_cell }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="month_cell">Miesiąc</label>
+                            <input type="text" id="month_cell" name="month_cell" value="{{ settings.month_cell }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="year_cell">Rok</label>
+                            <input type="text" id="year_cell" name="year_cell" value="{{ settings.year_cell }}" required>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <button type="submit">Zapisz ustawienia</button>
+        </form>
+    </section>
+</main>
+</body>
+</html>

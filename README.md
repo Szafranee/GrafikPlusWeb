@@ -20,6 +20,10 @@ A web-based version of [GrafikPlus](https://github.com/Szafranee/GrafikPlus) - a
   - Automatic mapping of program descriptions to standardized titles using CSV configuration
   - Live configuration updates - changes to mapping file are detected and applied automatically without restart
   - Efficient caching mechanism to optimize performance
+- Template-based monthly reports that preserve the workbook's formulas, styles,
+  validations, and embedded Excel extensions
+- Password-protected administrator panel for replacing the XLSX template and CSV
+  dictionary, and for configuring target cells
 
 ## 🚀 Quick Start
 
@@ -80,6 +84,17 @@ uv sync
 # Run development server
 uv run python run.py
 ```
+
+Copy `.env.example` to `.env` and set `ADMIN_USERNAME`, `ADMIN_PASSWORD`, and a
+random `SECRET_KEY` before opening `/admin/`. The browser displays its native
+HTTP Basic Auth dialog. If the administrator credentials are missing, the panel
+is disabled and returns HTTP 503.
+
+The template exporter is active by default. Set `USE_TEMPLATE_EXPORT=false` to
+restore the legacy standalone workbook exporter without removing it from the
+application. The bundled `report_template.xlsx` is used until an administrator
+uploads a replacement; uploaded templates and saved mappings are kept in the
+ignored `instance/` directory.
 
 ### Dependency Management
 

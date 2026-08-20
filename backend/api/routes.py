@@ -1,5 +1,14 @@
+from io import BytesIO
+from pathlib import Path
+
 from flask import Blueprint, request, jsonify, send_file, current_app
 from backend.config import ScheduleConfig
+from backend.reporting import (
+    POLISH_MONTHS,
+    ReportSettingsStore,
+    get_application_now,
+    template_export_enabled,
+)
 from backend.schedule_scraper import ScheduleScraper
 import tempfile
 import os
@@ -11,6 +20,18 @@ api_blueprint = Blueprint('api', __name__)
 def health_check():
     """Test endpoint to check if API is working"""
     return jsonify({"status": "ok"})
+
+@api_blueprint.route('/export-config', methods=['GET'])
+def export_config():
+    """Expose non-sensitive export mode information to the main form."""
+    now = get_application_now()
+    settings = ReportSettingsStore().load()
+    return jsonify({
+        "templateExportEnabled": template_export_enabled(),
+        "activityValue": settings.activity_value,
+        "month": POLISH_MONTHS[now.month - 1],
+        "year": now.year,
+    })
 
 @api_blueprint.route('/schedule', methods=['POST'])
 def get_schedule():
@@ -51,7 +72,7 @@ def get_schedule():
         try:
             # Get schedule
             scraper = ScheduleScraper(config)
-            scraper.scrape_schedule()
+            download_filename = scraper.scrape_schedule()
 
             # Get file path
             file_path = os.path.join(temp_dir, 'schedule.xlsx')
@@ -64,11 +85,12 @@ def get_schedule():
                 }), 500
 
             # Return file and ensure it's closed after sending
+            file_data = Path(file_path).read_bytes()
             return send_file(
-                file_path,
+                BytesIO(file_data),
                 mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                 as_attachment=True,
-                download_name='grafik.xlsx'
+                download_name=download_filename
             )
 
         except Exception as e:

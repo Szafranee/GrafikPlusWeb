@@ -9,6 +9,7 @@ from openpyxl.worksheet.table import Table, TableStyleInfo
 from openpyxl.utils import get_column_letter
 
 from backend.config import ScheduleConfig
+from backend.reporting import generate_template_report
 
 
 class ScheduleParser:
@@ -233,8 +234,25 @@ class ScheduleParser:
         """Set the parsed schedule data directly"""
         self.schedule_data = data
 
-    def save_to_xlsx(self) -> None:
+    def save_to_xlsx(self) -> str:
         """Save parsed schedule to Excel file with proper Polish locale handling"""
+        if self.schedule_config.use_template_export:
+            identity = generate_template_report(
+                schedule_data=self.schedule_data,
+                username=self.schedule_config.username,
+                output_path=self.schedule_config.get_full_output_path(),
+            )
+            logging.info(
+                "Template report saved successfully to %s",
+                self.schedule_config.get_full_output_path(),
+            )
+            return identity.filename
+
+        self._save_legacy_xlsx()
+        return self.schedule_config.output_filename
+
+    def _save_legacy_xlsx(self) -> None:
+        """Save parsed schedule using the original standalone workbook format."""
         headers = ['Data', 'Tytuł programu', 'Opis', 'Czynność', 'Liczba godzin', 'Od', 'Do'] if self.schedule_config.is_personal \
             else ['Data', 'Tytuł programu', 'Opis', 'Czynność', 'Liczba godzin', 'Od', 'Do', 'Montażysta']
 

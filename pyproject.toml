@@ -10,6 +10,7 @@ dependencies = [
     "flask",
     "flask-cors",
     "gunicorn",
+    "lxml>=6.1.2",
     "openpyxl",
     "pandas",
     "python-dotenv",
