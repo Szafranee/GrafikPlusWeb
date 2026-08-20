@@ -5,6 +5,7 @@ from typing import List, Dict, Optional
 
 from bs4 import BeautifulSoup
 from openpyxl import Workbook
+from openpyxl.utils import get_column_letter
 
 from backend.config import ScheduleConfig
 from backend.reporting import generate_template_report
@@ -277,6 +278,13 @@ class ScheduleParser:
         try:
             workbook = Workbook(write_only=True)
             worksheet = workbook.create_sheet(title="Grafik montaży")
+
+            for column_index, values in enumerate(zip(headers, *data), start=1):
+                content_width = max(len(str(value)) if value is not None else 0 for value in values)
+                worksheet.column_dimensions[get_column_letter(column_index)].width = (
+                    content_width + 2
+                )
+
             worksheet.append(headers)
             for row in data:
                 worksheet.append(row)
