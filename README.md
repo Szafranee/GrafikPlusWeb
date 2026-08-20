@@ -62,7 +62,7 @@ A web-based version of [GrafikPlus](https://github.com/Szafranee/GrafikPlus) - a
 - Python 3.x with Flask
 - BeautifulSoup4 for parsing
 - Requests for HTTP client
-- Pandas for Excel export
+- OpenPyXL for Excel export
 
 ## 🧪 Development
 
@@ -85,6 +85,19 @@ uv sync
 uv run python run.py
 ```
 
+Run the deterministic unit and integration tests with:
+
+```bash
+uv run python -m unittest discover -v
+```
+
+The suite uses local HTML fixtures and mocked HTTP responses, so it does not
+normally contact the external schedule service. To additionally verify the
+current login endpoint, schedule URL, live HTML structure, parser, and XLSX
+export, configure the `LIVE_SCHEDULE_*` values shown in `.env.example`, choose a
+date known to contain entries, and explicitly set
+`RUN_LIVE_SCHEDULE_TESTS=true`. Never enable the live test in public CI.
+
 Copy `.env.example` to `.env` and set `ADMIN_USERNAME`, `ADMIN_PASSWORD`, and a
 random `SECRET_KEY` before opening `/admin/`. The browser displays its native
 HTTP Basic Auth dialog. If the administrator credentials are missing, the panel
@@ -96,7 +109,7 @@ application. The bundled `report_template.xlsx` is used until an administrator
 uploads a replacement; uploaded templates and saved mappings are kept in the
 ignored `instance/` directory.
 
-### Dependency Management
+### 📦 Dependency Management
 
 Use `uv` for all dependency changes so that `pyproject.toml` and `uv.lock` stay in sync:
 
