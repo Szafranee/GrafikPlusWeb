@@ -16,7 +16,7 @@
 </head>
 <body x-data="themeHandler" :class="theme">
 
-<div class="container" x-data="scheduleForm" x-init="initializeDates">
+<div class="container" x-data='scheduleForm({{ default_installation_filename|tojson }})' x-init="initializeDates">
     <img class="logo logo-light" alt="GrafikPlusWeb Banner" src="https://github.com/Szafranee/GrafikPlusWeb/blob/main/docs/images/GrafikPlus_text_black.png?raw=true"/>
     <img class="logo logo-dark" alt="GrafikPlusWeb Banner Dark" src="https://github.com/Szafranee/GrafikPlusWeb/blob/main/docs/images/GrafikPlus_text_white.png?raw=true"/>
 
@@ -49,11 +49,11 @@
             <div class="section-header">Wybierz grafik</div>
             <div class="radio-group">
                 <label>
-                    <input type="radio" name="scheduleType" value="personal" x-model="scheduleType">
+                    <input type="radio" name="scheduleType" value="personal" x-model="scheduleType" @change="handleScheduleTypeChange($event.target.value)">
                     Grafik użytkownika
                 </label>
                 <label>
-                    <input type="radio" name="scheduleType" value="installation" x-model="scheduleType">
+                    <input type="radio" name="scheduleType" value="installation" x-model="scheduleType" @change="handleScheduleTypeChange($event.target.value)">
                     Grafik montaży
                 </label>
             </div>
@@ -93,11 +93,11 @@
                            id="filename"
                            x-model="filename"
                            :disabled="filenameLocked"
-                           placeholder="grafik.xlsx"
+                           :placeholder="defaultInstallationFilename"
                            required>
                     <button type="button"
                             class="filename-lock-toggle"
-                            x-show="templateExportEnabled"
+                            x-show="usesTemplateExport"
                             :class="{ 'is-active': filenameLocked }"
                             :aria-pressed="filenameLocked"
                             @click="toggleFilenameLock"
@@ -117,7 +117,7 @@
                         </svg>
                     </button>
                 </div>
-                <p class="filename-hint" x-show="templateExportEnabled">
+                <p class="filename-hint" x-show="usesTemplateExport">
                     <span x-show="filenameLocked">Nazwa jest tworzona automatycznie. Kliknij kłódkę, aby ją zmienić.</span>
                     <span x-show="!filenameLocked" x-cloak>Własna nazwa jest włączona. Kliknij otwartą kłódkę, aby wrócić do podglądu.</span>
                 </p>

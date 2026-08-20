@@ -1,11 +1,12 @@
 document.addEventListener('alpine:init', () => {
-    Alpine.data('scheduleForm', () => ({
+    Alpine.data('scheduleForm', (defaultInstallationFilename) => ({
         username: localStorage.getItem('lastUsername') || '',
         password: '',
         startDate: '',
         endDate: '',
         scheduleType: 'personal',
-        filename: 'grafik.xlsx',
+        filename: defaultInstallationFilename,
+        defaultInstallationFilename,
         templateExportEnabled: true,
         filenameLocked: true,
         reportActivity: 'MONTAŻ',
@@ -14,6 +15,10 @@ document.addEventListener('alpine:init', () => {
         message: '',
         minDate: '',
         maxDate: '',
+
+        get usesTemplateExport() {
+            return this.templateExportEnabled && this.scheduleType === 'personal';
+        },
 
         initializeDates() {
             const today = new Date();
@@ -51,11 +56,11 @@ document.addEventListener('alpine:init', () => {
                     this.reportActivity = config.activityValue;
                     this.reportMonth = config.month;
                     this.reportYear = config.year;
-                    this.filenameLocked = config.templateExportEnabled;
+                    this.filenameLocked = this.usesTemplateExport;
                     if (this.filenameLocked) {
                         this.updateFilenamePreview();
                     } else {
-                        this.filename = 'grafik.xlsx';
+                        this.filename = this.defaultInstallationFilename;
                     }
                 }
             } catch (error) {
@@ -72,7 +77,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         updateFilenamePreview() {
-            if (!this.templateExportEnabled || !this.filenameLocked) {
+            if (!this.usesTemplateExport || !this.filenameLocked) {
                 return;
             }
             const loginParts = this.username
@@ -91,6 +96,17 @@ document.addEventListener('alpine:init', () => {
                 .toLocaleUpperCase('pl-PL');
         },
 
+        handleScheduleTypeChange(scheduleType) {
+            this.scheduleType = scheduleType;
+            if (this.usesTemplateExport) {
+                this.filenameLocked = true;
+                this.updateFilenamePreview();
+            } else {
+                this.filenameLocked = false;
+                this.filename = this.defaultInstallationFilename;
+            }
+        },
+
         toggleFilenameLock() {
             this.filenameLocked = !this.filenameLocked;
             if (this.filenameLocked) {
@@ -99,7 +115,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         normalizedDownloadFilename(filename) {
-            const safeName = (filename || 'grafik.xlsx')
+            const safeName = (filename || this.defaultInstallationFilename)
                 .trim()
                 .replace(/[\\/:*?"<>|]+/g, '_');
             return safeName.toLowerCase().endsWith('.xlsx')
@@ -137,7 +153,7 @@ document.addEventListener('alpine:init', () => {
                 }
             }
             const plain = disposition.match(/filename="?([^";]+)"?/i);
-            return plain ? plain[1] : 'grafik.xlsx';
+            return plain ? plain[1] : this.defaultInstallationFilename;
         },
 
         async submitForm() {
@@ -173,7 +189,7 @@ document.addEventListener('alpine:init', () => {
                 const downloadUrl = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = downloadUrl;
-                a.download = this.filenameLocked
+                a.download = this.usesTemplateExport && this.filenameLocked
                     ? this.getDownloadFilename(response)
                     : this.normalizedDownloadFilename(this.filename);
                 document.body.appendChild(a);

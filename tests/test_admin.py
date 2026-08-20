@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from app import create_app
 from backend.admin import _validate_program_titles
+from backend.config import DEFAULT_INSTALLATION_FILENAME
 from backend.reporting import ReportConfigurationError
 
 
@@ -54,8 +55,13 @@ class AdminTests(unittest.TestCase):
         class FakeScraper:
             def __init__(self, config):
                 self.config = config
+                self.assert_default_filename = (
+                    config.output_filename == DEFAULT_INSTALLATION_FILENAME
+                )
 
             def scrape_schedule(self):
+                if not self.assert_default_filename:
+                    raise AssertionError("Unexpected default output filename")
                 Path(self.config.output_dir, self.config.output_filename).write_bytes(
                     b"xlsx-content"
                 )

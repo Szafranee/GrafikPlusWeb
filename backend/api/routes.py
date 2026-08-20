@@ -2,7 +2,7 @@ from io import BytesIO
 from pathlib import Path
 
 from flask import Blueprint, request, jsonify, send_file, current_app
-from backend.config import ScheduleConfig
+from backend.config import DEFAULT_INSTALLATION_FILENAME, ScheduleConfig
 from backend.reporting import (
     POLISH_MONTHS,
     ReportSettingsStore,
@@ -63,7 +63,7 @@ def get_schedule():
             username=data['username'],
             password=data['password'],
             output_dir=temp_dir,
-            output_filename='schedule.xlsx',
+            output_filename=DEFAULT_INSTALLATION_FILENAME,
             start_date=data['startDate'],
             end_date=data['endDate'],
             is_personal=data['isPersonal']
@@ -75,7 +75,7 @@ def get_schedule():
             download_filename = scraper.scrape_schedule()
 
             # Get file path
-            file_path = os.path.join(temp_dir, 'schedule.xlsx')
+            file_path = config.get_full_output_path()
 
             # Check if file exists
             if not os.path.exists(file_path):

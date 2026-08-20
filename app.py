@@ -3,6 +3,7 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 from backend.api.routes import api_blueprint
 from backend.admin import admin_blueprint
+from backend.config import DEFAULT_INSTALLATION_FILENAME
 import os
 from pathlib import Path
 
@@ -34,7 +35,10 @@ def create_app():
     @app.route('/')
     def index():
         try:
-            return render_template('index.html')
+            return render_template(
+                'index.html',
+                default_installation_filename=DEFAULT_INSTALLATION_FILENAME,
+            )
         except Exception as e:
             return f"Error loading template: {str(e)}"
 

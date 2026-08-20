@@ -137,6 +137,61 @@ class ReportingTests(unittest.TestCase):
             self.assertEqual(workbook.active["A2"].value, "18.05.2026")
             workbook.close()
 
+    def test_installation_schedule_is_plain_even_when_template_export_is_enabled(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = ScheduleConfig(
+                username="jan.kowalski",
+                password="secret",
+                output_dir=directory,
+                output_filename="installation.xlsx",
+                start_date="2026-05-18",
+                end_date="2026-05-18",
+                is_personal=False,
+                use_template_export=True,
+            )
+            parser = ScheduleParser("", config)
+            parser.set_parsed_data(
+                [
+                    {
+                        "date": "18.05.2026",
+                        "program_title": "Liga Polska",
+                        "description": "Mecz testowy",
+                        "activity": "Montaż",
+                        "duration": 2.5,
+                        "start_time": "10:00",
+                        "end_time": "12:30",
+                        "editor": "Jan Kowalski",
+                    }
+                ]
+            )
+
+            with patch("backend.schedule_parser.generate_template_report") as template:
+                self.assertEqual(parser.save_to_xlsx(), "installation.xlsx")
+            template.assert_not_called()
+
+            workbook = load_workbook(Path(directory) / "installation.xlsx")
+            worksheet = workbook.active
+            self.assertEqual(
+                [cell.value for cell in worksheet[1]],
+                [
+                    "Data",
+                    "Tytuł programu",
+                    "Opis",
+                    "Czynność",
+                    "Liczba godzin",
+                    "Od",
+                    "Do",
+                    "Montażysta",
+                ],
+            )
+            self.assertEqual(worksheet["E2"].value, 2.5)
+            self.assertEqual(len(worksheet.tables), 0)
+            self.assertIsNone(worksheet.auto_filter.ref)
+            self.assertTrue(
+                all(cell.style_id == 0 for row in worksheet.iter_rows() for cell in row)
+            )
+            workbook.close()
+
     @staticmethod
     def _cell(root, reference):
         return root.xpath(f"//m:c[@r='{reference}']", namespaces=NSMAP)[0]

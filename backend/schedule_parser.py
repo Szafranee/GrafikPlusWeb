@@ -3,10 +3,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Dict, Optional
 
-import pandas as pd
 from bs4 import BeautifulSoup
-from openpyxl.worksheet.table import Table, TableStyleInfo
-from openpyxl.utils import get_column_letter
+from openpyxl import Workbook
 
 from backend.config import ScheduleConfig
 from backend.reporting import generate_template_report
@@ -236,7 +234,7 @@ class ScheduleParser:
 
     def save_to_xlsx(self) -> str:
         """Save parsed schedule to Excel file with proper Polish locale handling"""
-        if self.schedule_config.use_template_export:
+        if self.schedule_config.is_personal and self.schedule_config.use_template_export:
             identity = generate_template_report(
                 schedule_data=self.schedule_data,
                 username=self.schedule_config.username,
@@ -252,7 +250,7 @@ class ScheduleParser:
         return self.schedule_config.output_filename
 
     def _save_legacy_xlsx(self) -> None:
-        """Save parsed schedule using the original standalone workbook format."""
+        """Save parsed schedule as plain cells without styles or an Excel table."""
         headers = ['Data', 'Tytuł programu', 'Opis', 'Czynność', 'Liczba godzin', 'Od', 'Do'] if self.schedule_config.is_personal \
             else ['Data', 'Tytuł programu', 'Opis', 'Czynność', 'Liczba godzin', 'Od', 'Do', 'Montażysta']
 
@@ -276,64 +274,13 @@ class ScheduleParser:
                 row.append(entry['editor'])
             data.append(row)
 
-        df = pd.DataFrame(data, columns=headers)
-
         try:
-            writer = pd.ExcelWriter(
-                output_file_path,
-                engine='openpyxl'
-            )
-
-            # Save DataFrame to Excel
-            df.to_excel(writer, index=False)
-
-            # Access the sheet
-            worksheet = writer.sheets['Sheet1']
-
-            # Formating the hours column
-            col_idx = headers.index('Liczba godzin') + 1
-            for row in range(2, len(df) + 2):
-                cell = worksheet.cell(row=row, column=col_idx)
-                # Format the cell as number with two decimal places
-                cell.number_format = '#,##0.00'
-
-                # We make sure that the value is a float
-                try:
-                    cell.value = float(cell.value)
-                except (ValueError, TypeError):
-                    logging.warning(f"Could not convert value {cell.value} to float")
-
-            # Create Excel Table (with auto-filter, sorting and built-in styling)
-            num_rows = len(df)
-            num_cols = len(headers)
-            last_col_letter = get_column_letter(num_cols)
-            table_ref = f"A1:{last_col_letter}{num_rows + 1}"
-
-            table = Table(displayName="GrafikPlus", ref=table_ref)
-            table.tableStyleInfo = TableStyleInfo(
-                name="TableStyleMedium9",
-                showFirstColumn=False,
-                showLastColumn=False,
-                showRowStripes=True,
-                showColumnStripes=False
-            )
-            worksheet.add_table(table)
-
-            # Adjust column widths
-            for idx, col in enumerate(worksheet.columns, 1):
-                max_length = 0
-                column = worksheet.column_dimensions[get_column_letter(idx)]
-
-                for cell in col:
-                    try:
-                        max_length = max(max_length, len(str(cell.value)))
-                    except TypeError:
-                        pass
-
-                adjusted_width = (max_length + 2)
-                column.width = adjusted_width
-
-            writer.close()
+            workbook = Workbook(write_only=True)
+            worksheet = workbook.create_sheet(title="Grafik montaży")
+            worksheet.append(headers)
+            for row in data:
+                worksheet.append(row)
+            workbook.save(output_file_path)
             logging.info(f"Schedule saved successfully to {output_file_path}")
 
         except PermissionError:

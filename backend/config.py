@@ -4,6 +4,9 @@ from pathlib import Path
 from backend.program_titles import ProgramTitles
 from backend.reporting import template_export_enabled
 
+
+DEFAULT_INSTALLATION_FILENAME = "grafik_montazy.xlsx"
+
 @dataclass
 class ScheduleConfig:
     # Authentication data
