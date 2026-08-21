@@ -40,9 +40,21 @@ class ReportingTests(unittest.TestCase):
             "KOWALSKI_JAN_MONTAŻ_RAPORT_MAJ_2026.XLSX",
         )
 
-    def test_identity_rejects_login_without_last_name(self):
+    def test_identity_uses_entire_dotless_login_as_last_name(self):
+        identity = build_report_identity(
+            "jkowalski",
+            current_time=datetime(2026, 5, 20, 12, 0),
+        )
+
+        self.assertEqual(identity.full_name, "Jkowalski")
+        self.assertEqual(
+            identity.filename,
+            "JKOWALSKI_MONTAŻ_RAPORT_MAJ_2026.XLSX",
+        )
+
+    def test_identity_rejects_incomplete_dotted_login(self):
         with self.assertRaises(ReportConfigurationError):
-            build_report_identity("jan")
+            build_report_identity("jan.")
 
     def test_template_report_only_updates_data_and_calculation_settings(self):
         data = [
@@ -104,6 +116,32 @@ class ReportingTests(unittest.TestCase):
                 self.assertEqual(calculation.get("calcOnSave"), "1")
                 self.assertEqual(calculation.get("fullCalcOnLoad"), "1")
                 self.assertEqual(calculation.get("forceFullCalc"), "1")
+
+    def test_template_report_writes_dotless_login_as_full_name(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output_path = Path(directory) / "result.xlsx"
+            missing_managed_template = Path(directory) / "managed.xlsx"
+            with (
+                patch("backend.reporting.MANAGED_TEMPLATE_PATH", missing_managed_template),
+                patch("backend.reporting.DEFAULT_TEMPLATE_PATH", TEMPLATE_PATH),
+                patch.dict(os.environ, {}, clear=False),
+            ):
+                os.environ.pop("REPORT_TEMPLATE_PATH", None)
+                identity = generate_template_report(
+                    [],
+                    "jkowalski",
+                    output_path,
+                    current_time=datetime(2026, 5, 20, 12, 0),
+                )
+
+            self.assertEqual(
+                identity.filename,
+                "JKOWALSKI_MONTAŻ_RAPORT_MAJ_2026.XLSX",
+            )
+            with ZipFile(output_path) as result:
+                worksheet_path = _resolve_worksheet_path(result, "Raport")
+                root = etree.fromstring(result.read(worksheet_path))
+                self.assertEqual(self._cell_text(root, "F3"), "Jkowalski")
 
     def test_legacy_export_remains_available(self):
         with tempfile.TemporaryDirectory() as directory:

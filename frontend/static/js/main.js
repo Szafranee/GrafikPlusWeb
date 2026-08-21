@@ -85,14 +85,15 @@ document.addEventListener('alpine:init', () => {
                 .split('.')
                 .map(part => part.trim())
                 .filter(Boolean);
-            const firstName = this.filenameComponent(loginParts[0], 'IMIĘ');
-            const lastName = this.filenameComponent(
-                loginParts.slice(1).join('_'),
-                'NAZWISKO'
-            );
             const activity = this.filenameComponent(this.reportActivity, 'CZYNNOŚĆ');
             const month = this.filenameComponent(this.reportMonth, 'MIESIĄC');
-            this.filename = `${lastName}_${firstName}_${activity}_RAPORT_${month}_${this.reportYear || 'ROK'}.XLSX`
+            const nameParts = this.username.includes('.')
+                ? [
+                    this.filenameComponent(loginParts.slice(1).join('_'), 'NAZWISKO'),
+                    this.filenameComponent(loginParts[0], 'IMIĘ')
+                ]
+                : [this.filenameComponent(loginParts[0], 'NAZWISKO')];
+            this.filename = `${nameParts.join('_')}_${activity}_RAPORT_${month}_${this.reportYear || 'ROK'}.XLSX`
                 .toLocaleUpperCase('pl-PL');
         },
 

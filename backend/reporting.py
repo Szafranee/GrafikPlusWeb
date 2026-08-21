@@ -210,23 +210,28 @@ def build_report_identity(
     current_time: datetime | None = None,
 ) -> ReportIdentity:
     login_parts = [part.strip() for part in username.strip().split(".") if part.strip()]
-    if len(login_parts) < 2:
+    if "." not in username:
+        first_name = ""
+        last_name = username.strip().capitalize()
+    elif len(login_parts) >= 2:
+        first_name = login_parts[0].capitalize()
+        last_name = " ".join(part.capitalize() for part in login_parts[1:])
+    else:
         raise ReportConfigurationError(
             "Login must use the imie.nazwisko format to generate the report."
         )
 
-    first_name = login_parts[0].capitalize()
-    last_name = " ".join(part.capitalize() for part in login_parts[1:])
     now = current_time or get_application_now()
     month = POLISH_MONTHS[now.month - 1]
-    safe_first_name = _filename_component(first_name)
     safe_last_name = _filename_component(last_name)
     safe_activity = _filename_component(activity)
-    filename = (
-        f"{safe_last_name}_{safe_first_name}_{safe_activity}_RAPORT_{month}_{now.year}.xlsx"
-    ).upper()
+    filename_parts = [safe_last_name]
+    if first_name:
+        filename_parts.append(_filename_component(first_name))
+    filename_parts.extend((safe_activity, "RAPORT", month, str(now.year)))
+    filename = ("_".join(filename_parts) + ".xlsx").upper()
     return ReportIdentity(
-        full_name=f"{first_name} {last_name}",
+        full_name=" ".join(part for part in (first_name, last_name) if part),
         month=month,
         year=now.year,
         filename=filename,
