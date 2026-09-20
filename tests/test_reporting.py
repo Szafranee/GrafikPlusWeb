@@ -13,10 +13,13 @@ from backend.config import ScheduleConfig
 from backend.reporting import (
     NSMAP,
     ReportConfigurationError,
+    ReportSettings,
+    ReportSettingsStore,
     WORKBOOK_PATH,
     _resolve_worksheet_path,
     build_report_identity,
     generate_template_report,
+    install_template,
 )
 from backend.schedule_parser import ScheduleParser
 
@@ -56,6 +59,51 @@ class ReportingTests(unittest.TestCase):
         with self.assertRaises(ReportConfigurationError):
             build_report_identity("jan.")
 
+    def test_template_and_worksheet_can_be_replaced_in_either_order(self):
+        """A temporary mismatch must not block replacing a template and its mapping."""
+        with tempfile.TemporaryDirectory() as directory:
+            directory_path = Path(directory)
+            settings_store = ReportSettingsStore(directory_path / "settings.json")
+
+            # The mapping can be changed before the matching template is uploaded.
+            settings = settings_store.save({"worksheet": "Nowy raport"})
+            self.assertEqual(settings.worksheet, "Nowy raport")
+
+            # Conversely, a valid new template can be uploaded before its mapping.
+            managed_template = directory_path / "report_template.xlsx"
+            with (
+                patch("backend.reporting.INSTANCE_DIR", directory_path),
+                patch("backend.reporting.MANAGED_TEMPLATE_PATH", managed_template),
+                patch("backend.reporting.ReportSettingsStore") as settings_store_class,
+            ):
+                settings_store_class.return_value.load.return_value = ReportSettings(
+                    worksheet="Previous worksheet"
+                )
+                installed_path = install_template(
+                    TEMPLATE_PATH.read_bytes(), "new-template.xlsx"
+                )
+
+            self.assertEqual(installed_path, managed_template)
+            self.assertTrue(managed_template.is_file())
+
+    def test_report_generation_still_requires_the_configured_worksheet(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output_path = Path(directory) / "result.xlsx"
+            missing_managed_template = Path(directory) / "managed.xlsx"
+            with (
+                patch("backend.reporting.MANAGED_TEMPLATE_PATH", missing_managed_template),
+                patch("backend.reporting.DEFAULT_TEMPLATE_PATH", TEMPLATE_PATH),
+                patch.dict(os.environ, {}, clear=False),
+            ):
+                os.environ.pop("REPORT_TEMPLATE_PATH", None)
+                with self.assertRaisesRegex(ReportConfigurationError, "was not found"):
+                    generate_template_report(
+                        [],
+                        "jan.kowalski",
+                        output_path,
+                        settings=ReportSettings(worksheet="Missing worksheet"),
+                    )
+
     def test_template_report_only_updates_data_and_calculation_settings(self):
         data = [
             {
@@ -78,6 +126,7 @@ class ReportingTests(unittest.TestCase):
                     data,
                     "jan.kowalski",
                     output_path,
+                    settings=ReportSettings(),
                     current_time=datetime(2026, 5, 20, 12, 0),
                 )
 
@@ -131,6 +180,7 @@ class ReportingTests(unittest.TestCase):
                     [],
                     "jkowalski",
                     output_path,
+                    settings=ReportSettings(),
                     current_time=datetime(2026, 5, 20, 12, 0),
                 )
 

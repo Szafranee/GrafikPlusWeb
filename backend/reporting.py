@@ -156,9 +156,6 @@ class ReportSettingsStore:
 
     def save(self, values: dict[str, Any]) -> ReportSettings:
         settings = ReportSettings.from_dict(values)
-        template_path = get_report_template_path(required=False)
-        if template_path:
-            validate_template_file(template_path, settings.worksheet)
 
         with self._lock:
             self.settings_path.parent.mkdir(parents=True, exist_ok=True)
@@ -245,20 +242,18 @@ def _filename_component(value: str) -> str:
     return normalized
 
 
-def validate_template_file(path: Path, worksheet: str) -> None:
+def validate_template_file(path: Path) -> None:
     try:
         with ZipFile(path) as workbook:
             _validate_archive(workbook)
-            _resolve_worksheet_path(workbook, worksheet)
     except (BadZipFile, KeyError, etree.XMLSyntaxError) as exc:
         raise ReportConfigurationError("The uploaded file is not a valid XLSX template.") from exc
 
 
-def validate_template_bytes(data: bytes, worksheet: str) -> None:
+def validate_template_bytes(data: bytes) -> None:
     try:
         with ZipFile(BytesIO(data)) as workbook:
             _validate_archive(workbook)
-            _resolve_worksheet_path(workbook, worksheet)
     except (BadZipFile, KeyError, etree.XMLSyntaxError) as exc:
         raise ReportConfigurationError("The uploaded file is not a valid XLSX template.") from exc
 
@@ -266,8 +261,7 @@ def validate_template_bytes(data: bytes, worksheet: str) -> None:
 def install_template(data: bytes, original_filename: str) -> Path:
     if not original_filename.lower().endswith(".xlsx"):
         raise ReportConfigurationError("The report template must be an XLSX file.")
-    settings = ReportSettingsStore().load()
-    validate_template_bytes(data, settings.worksheet)
+    validate_template_bytes(data)
     INSTANCE_DIR.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(
         dir=INSTANCE_DIR, suffix=".xlsx.tmp", delete=False
