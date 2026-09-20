@@ -10,11 +10,13 @@ from pathlib import Path
 from flask import (
     Blueprint,
     Response,
+    abort,
     current_app,
     flash,
     redirect,
     render_template,
     request,
+    send_file,
     url_for,
 )
 
@@ -164,6 +166,20 @@ def upload_template():
     return redirect(url_for("admin.index"))
 
 
+@admin_blueprint.get("/template/download")
+@admin_required
+def download_template():
+    template_path = get_report_template_path(required=False)
+    if template_path is None:
+        abort(404)
+    return send_file(
+        template_path,
+        as_attachment=True,
+        download_name=template_path.name,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
 @admin_blueprint.post("/program-titles")
 @admin_required
 def upload_program_titles():
@@ -175,3 +191,16 @@ def upload_program_titles():
         current_app.logger.warning("Program-title upload failed: %s", exc)
         flash(str(exc), "error")
     return redirect(url_for("admin.index"))
+
+
+@admin_blueprint.get("/program-titles/download")
+@admin_required
+def download_program_titles():
+    if not PROGRAM_TITLES_PATH.is_file():
+        abort(404)
+    return send_file(
+        PROGRAM_TITLES_PATH,
+        as_attachment=True,
+        download_name=PROGRAM_TITLES_PATH.name,
+        mimetype="text/csv",
+    )

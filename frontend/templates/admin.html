@@ -48,6 +48,9 @@
                 <strong>{{ template_details.name }}</strong><br>
                 <span>Ostatnia zmiana: {{ template_details.modified }}</span>
             </p>
+            {% if template_details.exists %}
+                <a class="file-download" href="{{ url_for('admin.download_template') }}">Pobierz aktualny szablon</a>
+            {% endif %}
             <form action="{{ url_for('admin.upload_template') }}" method="post" enctype="multipart/form-data">
                 <div class="form-group">
                     <label for="template">Nowy plik XLSX</label>
@@ -64,6 +67,9 @@
                 <strong>{{ csv_details.name }}</strong><br>
                 <span>Ostatnia zmiana: {{ csv_details.modified }}</span>
             </p>
+            {% if csv_details.exists %}
+                <a class="file-download" href="{{ url_for('admin.download_program_titles') }}">Pobierz aktualny słownik</a>
+            {% endif %}
             <form action="{{ url_for('admin.upload_program_titles') }}" method="post" enctype="multipart/form-data">
                 <div class="form-group">
                     <label for="program_titles">Nowy plik CSV (UTF-8, separator „;”)</label>

@@ -550,6 +550,19 @@ button[type="submit"]:active {
     color: #bbb;
 }
 
+.file-download {
+    display: block;
+    width: fit-content;
+    margin: -6px auto 16px;
+    color: var(--primary-color);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.file-download:hover {
+    color: var(--primary-hover);
+}
+
 .admin-status {
     display: flex;
     align-items: center;

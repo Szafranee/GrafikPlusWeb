@@ -1,5 +1,6 @@
 import base64
 import os
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -39,6 +40,40 @@ class AdminTests(unittest.TestCase):
         _validate_program_titles("Opis;Tytuł\nMECZ;Sport\n".encode(), "titles.csv")
         with self.assertRaises(ReportConfigurationError):
             _validate_program_titles(b"only-one-column\n", "titles.csv")
+
+    def test_admin_can_download_current_template_and_program_titles(self):
+        token = base64.b64encode(b"operator:correct-secret").decode("ascii")
+        headers = {"Authorization": f"Basic {token}"}
+        with tempfile.TemporaryDirectory() as directory:
+            directory_path = Path(directory)
+            template_path = directory_path / "template.xlsx"
+            csv_path = directory_path / "program_titles.csv"
+            template_path.write_bytes(b"template-content")
+            csv_content = "Opis;Tytuł\nMECZ;Sport\n".encode("utf-8")
+            csv_path.write_bytes(csv_content)
+
+            with (
+                patch.dict(
+                    os.environ,
+                    {"ADMIN_USERNAME": "operator", "ADMIN_PASSWORD": "correct-secret"},
+                ),
+                patch("backend.admin.get_report_template_path", return_value=template_path),
+                patch("backend.admin.PROGRAM_TITLES_PATH", csv_path),
+            ):
+                client = create_app().test_client()
+                template_response = client.get(
+                    "/admin/template/download", headers=headers, buffered=True
+                )
+                csv_response = client.get(
+                    "/admin/program-titles/download", headers=headers, buffered=True
+                )
+
+        self.assertEqual(template_response.status_code, 200)
+        self.assertEqual(template_response.data, b"template-content")
+        self.assertIn("attachment", template_response.headers["Content-Disposition"])
+        self.assertEqual(csv_response.status_code, 200)
+        self.assertEqual(csv_response.data, csv_content)
+        self.assertIn("attachment", csv_response.headers["Content-Disposition"])
 
     def test_export_config_contains_filename_preview_data(self):
         response = create_app().test_client().get("/api/export-config")
