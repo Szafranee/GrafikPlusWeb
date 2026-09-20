@@ -371,25 +371,58 @@ button[type="submit"]:active {
 
 /* Responsive design */
 @media (max-width: 640px) {
+    body {
+        padding: 8px;
+    }
+
     .container {
-        padding: 15px;
-        margin: 10px;
+        padding: 12px;
+        margin: 0;
+        border-radius: 8px;
+    }
+
+    /* Keep the logo clear of the two controls positioned in the top-right corner. */
+    .container > .logo {
+        width: min(220px, calc(100% - 104px));
+        margin: 4px 0 14px;
     }
 
     .theme-toggle {
-        top: 10px;
-        right: 10px;
+        top: 8px;
+        right: 8px;
+        width: 36px;
+        height: 36px;
     }
 
     .admin-link {
-        top: 10px;
-        right: 60px;
+        top: 8px;
+        right: 52px;
+        width: 36px;
+        height: 36px;
+    }
+
+    .section {
+        padding: 14px 12px 4px;
+        margin-bottom: 8px;
+    }
+
+    .form-group {
+        margin-bottom: 12px;
+    }
+
+    .section-header {
+        margin-bottom: 8px;
     }
 
     .radio-group {
         flex-direction: column;
-        align-items: center;
-        gap: 15px;
+        align-items: stretch;
+        gap: 12px;
+        margin: 8px 0 12px;
+    }
+
+    .radio-group label {
+        min-height: 32px;
     }
 }
 
