@@ -143,7 +143,7 @@ function Get-PresetFiles {
         }
         "frontend" { return @($ALL_FILES | Where-Object { $_ -like "frontend/*" }) }
         "python" { return @($ALL_FILES | Where-Object { $_ -like "*.py" }) }
-        "dependencies" { return @("pyproject.toml", "uv.lock") }
+        "dependencies" { return @("pyproject.toml", "uv.lock", ".python-version") }
         "csv" { return @("backend/data/program_titles.csv") }
         "static" { return @($ALL_FILES | Where-Object { $_ -like "frontend/static/*" }) }
         "config" { return @("backend/config.py") }
@@ -191,7 +191,7 @@ function Test-DependencyFilesIncluded {
         $normalizedItem = ($item -replace '\\', '/') -replace '^\./', ''
         $normalizedItem = $normalizedItem.TrimEnd('/')
 
-        if ($normalizedItem -in @('pyproject.toml', 'uv.lock')) {
+        if ($normalizedItem -in @('pyproject.toml', 'uv.lock', '.python-version')) {
             return $true
         }
 
@@ -390,7 +390,7 @@ function Show-Menu {
     Write-Host "  [5] csv       - backend/data/program_titles.csv" -ForegroundColor Yellow
     Write-Host "  [6] static    - frontend/static/ (CSS, JS, img)" -ForegroundColor Yellow
     Write-Host "  [7] config    - backend/config.py" -ForegroundColor Yellow
-    Write-Host "  [8] dependencies - pyproject.toml + uv.lock (runs uv sync)" -ForegroundColor Yellow
+    Write-Host "  [8] dependencies - pyproject.toml, uv.lock, .python-version (runs uv sync)" -ForegroundColor Yellow
     Write-Host "  [9] custom    - enter paths manually (SMART SEARCH)" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "  [Q] Quit" -ForegroundColor DarkGray
