@@ -49,7 +49,7 @@ Skipping the restart does not skip environment synchronization and startup valid
 | --- | --- |
 | `changed` | Discovers deployable Git files automatically, compares their local and remote MD5 hashes, and uploads only new or modified files. |
 | `all` | Uploads every automatically discovered deployable Git file. |
-| `dependencies` | Uploads `pyproject.toml` and `uv.lock`, runs remote `uv sync`, and restarts Passenger unless restart is disabled. |
+| `dependencies` | Uploads `pyproject.toml`, `uv.lock` and `.python-version`, runs remote `uv sync`, and restarts Passenger unless restart is disabled. |
 | `backend` | Uploads the application entry points and `backend/`. |
 | `frontend` | Uploads `frontend/`. |
 | `python` | Uploads the configured Python source files. |

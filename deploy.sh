@@ -149,7 +149,7 @@ get_preset_files() {
         python)
             for file in "${ALL_FILES[@]}"; do [[ "$file" == *.py ]] && printf '%s\n' "$file"; done
             ;;
-        dependencies) printf '%s\n' "pyproject.toml" "uv.lock" ;;
+        dependencies) printf '%s\n' "pyproject.toml" "uv.lock" ".python-version" ;;
         csv) printf '%s\n' "backend/data/program_titles.csv" ;;
         static)
             for file in "${ALL_FILES[@]}"; do [[ "$file" == frontend/static/* ]] && printf '%s\n' "$file"; done
@@ -168,7 +168,7 @@ selection_includes_dependencies() {
     for item in "$@"; do
         normalized="${item#./}"
         normalized="${normalized%/}"
-        if [[ "$normalized" == "pyproject.toml" || "$normalized" == "uv.lock" ]]; then
+        if [[ "$normalized" == "pyproject.toml" || "$normalized" == "uv.lock" || "$normalized" == ".python-version" ]]; then
             return 0
         fi
 
@@ -331,7 +331,7 @@ show_menu() {
         echo "  [5] csv       - backend/data/program_titles.csv"
         echo "  [6] static    - frontend/static/ (CSS, JS, img)"
         echo "  [7] config    - backend/config.py"
-        echo "  [8] dependencies - pyproject.toml + uv.lock (runs uv sync)"
+        echo "  [8] dependencies - pyproject.toml, uv.lock, .python-version (runs uv sync)"
         echo "  [9] custom    - enter paths manually"
         echo ""
         echo "  [Q] Quit"
