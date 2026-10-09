@@ -556,6 +556,9 @@ ACTUAL_PYTHON=`$(.venv/bin/python -c 'import sys; print(sys.version_info.major,s
 test "`$ACTUAL_PYTHON" = "`$EXPECTED_PYTHON" &&
 .venv/bin/python -c 'from lxml import etree; from app import create_app; create_app()'
 "@
+# The script may be checked out with CRLF line endings on Windows. Bash on the server must get
+# plain LF: a stray CR splits the && chain, so a failed step would no longer stop the deploy.
+$SyncCommand = $SyncCommand -replace "`r", ""
 $SshArgs = Get-SshArgs
 $SshArgs += @("$SERVER_USER@$SERVER_HOST", $SyncCommand)
 ssh @SshArgs
