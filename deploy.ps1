@@ -33,17 +33,20 @@ if ($SERVER_HOST -eq "your-server.com" -or $SERVER_USER -eq "user") {
     exit 1
 }
 
+# Fail instead of hanging forever when the server stops answering mid-transfer.
+$SshTimeoutOptions = @("-o", "ConnectTimeout=20", "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=4")
+
 # ── SSH helper args ──────────────────────────────────────────
 function Get-SshArgs {
     $hostKeyPolicy = if ($SSH_HOST_KEY_POLICY) { $SSH_HOST_KEY_POLICY } else { "accept-new" }
-    $sshParams = @("-p", $SERVER_PORT, "-o", "StrictHostKeyChecking=$hostKeyPolicy")
+    $sshParams = @("-p", $SERVER_PORT, "-o", "StrictHostKeyChecking=$hostKeyPolicy") + $SshTimeoutOptions
     if ($SSH_KEY -ne "") { $sshParams += @("-i", $SSH_KEY) }
     return $sshParams
 }
 
 function Get-ScpArgs {
     $hostKeyPolicy = if ($SSH_HOST_KEY_POLICY) { $SSH_HOST_KEY_POLICY } else { "accept-new" }
-    $scpParams = @("-P", $SERVER_PORT, "-o", "StrictHostKeyChecking=$hostKeyPolicy")
+    $scpParams = @("-P", $SERVER_PORT, "-o", "StrictHostKeyChecking=$hostKeyPolicy") + $SshTimeoutOptions
     if ($SSH_KEY -ne "") { $scpParams += @("-i", $SSH_KEY) }
     return $scpParams
 }
@@ -321,54 +324,84 @@ function Get-ChangedFiles {
     return $changed
 }
 
-# ── Function: upload a file or directory ────────────────────
-function Send-Item {
-    param([string]$LocalItem)
+# ── Upload: one archive over one connection ─────────────────
+# Sending file by file needs two SSH connections per file, which trips the
+# hosting's connection limits on bigger deploys (stalls, timeouts). All files go
+# into one archive instead: one SCP upload, then one SSH call extracts it, so the
+# server never sees a half-uploaded set of files.
+function Resolve-UploadFiles {
+    param([string[]]$Items)
 
-    $LocalItem = $LocalItem -replace '\\', '/'
-    if (Test-ExcludedPath $LocalItem) {
-        Write-Host "  [SKIP] Excluded path: $LocalItem" -ForegroundColor DarkGray
-        return
-    }
-
-    $LocalPath = Join-Path $PSScriptRoot $LocalItem
-
-    if (-not (Test-Path $LocalPath)) {
-        Write-Host "  [SKIP] Not found: $LocalItem" -ForegroundColor Yellow
-        return
-    }
-
-    if ((Get-Item $LocalPath).PSIsContainer) {
-        # Upload directory contents individually so excluded directories are never passed to SCP.
-        Get-ChildItem -LiteralPath $LocalPath -Recurse -File -ErrorAction SilentlyContinue |
-            ForEach-Object {
+    $files = @()
+    foreach ($rawItem in $Items) {
+        $item = ($rawItem -replace '\\', '/') -replace '^\./', ''
+        if (Test-ExcludedPath $item) {
+            Write-Host "  [SKIP] Excluded path: $item" -ForegroundColor DarkGray
+            continue
+        }
+        $localPath = Join-Path $PSScriptRoot $item
+        if (-not (Test-Path -LiteralPath $localPath)) {
+            Write-Host "  [SKIP] Not found: $item" -ForegroundColor Yellow
+            continue
+        }
+        if ((Get-Item -LiteralPath $localPath).PSIsContainer) {
+            Get-ChildItem -LiteralPath $localPath -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object {
                 $relativePath = $_.FullName.Substring($PSScriptRoot.Length + 1) -replace '\\', '/'
-                if (-not (Test-ExcludedPath $relativePath)) {
-                    Send-Item -LocalItem $relativePath
-                }
+                if (-not (Test-ExcludedPath $relativePath)) { $files += $relativePath }
             }
-        return
+        } else {
+            $files += $item
+        }
     }
+    return @($files | Select-Object -Unique)
+}
 
-    # Ensure the remote directory exists before uploading the file.
-    $RemoteDir = ($REMOTE_APP_DIR + "/" + $LocalItem) | Split-Path -Parent
-    $RemoteDir = $RemoteDir -replace '\\', '/'
-    $SshArgs = Get-SshArgs
-    $SshArgs += @("$SERVER_USER@$SERVER_HOST", "mkdir -p '$RemoteDir'")
-    ssh @SshArgs 2>$null
+function Send-Archive {
+    param([string[]]$Files)
 
-    $ScpArgs = Get-ScpArgs
-    $ScpArgs += @($LocalPath, "$SERVER_USER@${SERVER_HOST}:$REMOTE_APP_DIR/$LocalItem")
+    $remoteName = ".deploy-upload-{0}.tgz" -f [guid]::NewGuid().ToString("N")
+    $archive = Join-Path ([IO.Path]::GetTempPath()) $remoteName
+    $listFile = "$archive.list"
+    try {
+        [IO.File]::WriteAllLines($listFile, $Files, (New-Object System.Text.UTF8Encoding($false)))
+        & tar --format=ustar -czf $archive -C $PSScriptRoot -T $listFile
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "  [ERROR] Could not create the upload archive (tar)." -ForegroundColor Red
+            return $false
+        }
+        $sizeKb = [math]::Ceiling((Get-Item -LiteralPath $archive).Length / 1KB)
 
-    Write-Host "  -> $LocalItem" -ForegroundColor Cyan -NoNewline
+        $uploaded = $false
+        for ($attempt = 1; $attempt -le 3 -and -not $uploaded; $attempt++) {
+            Write-Host "  -> $($Files.Count) files, one archive ($sizeKb KB), attempt $attempt/3" -ForegroundColor Cyan -NoNewline
+            $ScpArgs = Get-ScpArgs
+            $ScpArgs += @($archive, "$SERVER_USER@${SERVER_HOST}:$remoteName")
+            $result = scp @ScpArgs 2>&1
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "  [OK]" -ForegroundColor Green
+                $uploaded = $true
+            } else {
+                Write-Host "  [ERROR]" -ForegroundColor Red
+                Write-Host "     $result" -ForegroundColor DarkRed
+                if ($attempt -lt 3) { Start-Sleep -Seconds (5 * $attempt) }
+            }
+        }
+        if (-not $uploaded) { return $false }
 
-    $result = scp @ScpArgs 2>&1
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "  [OK]" -ForegroundColor Green
-    } else {
-        Write-Host "  [ERROR]" -ForegroundColor Red
-        Write-Host "     $result" -ForegroundColor DarkRed
-        $script:UploadFailed = $true
+        # Extract into the app directory and remove the uploaded archive (it sits in the remote home dir).
+        $remoteDirectory = ConvertTo-ShellLiteral $REMOTE_APP_DIR
+        $extractCommand = "mkdir -p -- $remoteDirectory && tar -xzf ~/$remoteName -C $remoteDirectory; status=`$?; rm -f ~/$remoteName; exit `$status"
+        $SshArgs = Get-SshArgs
+        $SshArgs += @("$SERVER_USER@$SERVER_HOST", $extractCommand)
+        ssh @SshArgs
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "  [ERROR] Extracting the archive on the server failed." -ForegroundColor Red
+            return $false
+        }
+        $Files | ForEach-Object { Write-Host "     $_" -ForegroundColor DarkGray }
+        return $true
+    } finally {
+        Remove-Item -LiteralPath $archive, $listFile -ErrorAction SilentlyContinue
     }
 }
 
@@ -532,8 +565,13 @@ if ($confirm -ne "" -and $confirm.ToUpper() -ne "Y") {
 # Upload
 Write-Host ""
 Write-Host "Uploading files..." -ForegroundColor White
-foreach ($item in $itemsToSend) {
-    Send-Item -LocalItem ($item -replace '\\', '/')
+$filesToUpload = @(Resolve-UploadFiles $itemsToSend)
+if ($filesToUpload.Count -eq 0) {
+    Write-Host "Nothing to upload after filtering protected and missing paths." -ForegroundColor Yellow
+    exit 1
+}
+if (-not (Send-Archive -Files $filesToUpload)) {
+    $script:UploadFailed = $true
 }
 
 if ($script:UploadFailed) {

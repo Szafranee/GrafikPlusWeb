@@ -105,7 +105,16 @@ The preflight also checks that `.venv` uses the Python minor version pinned in
 `.python-version`. If synchronization, version validation, or application import
 fails, deployment exits without restarting Passenger. Directory uploads are
 expanded into individual files; `.venv/`, `.uv/`, and `__pycache__/` are always
-excluded from SCP.
+excluded.
+
+The selected files are packed into one `.tgz` archive (built with the `tar` that
+ships with Windows 10+, macOS and Linux), uploaded with a single SCP call and
+extracted on the server with a single SSH call. Uploading file by file needed two
+SSH connections per file, which tripped the hosting's connection limits on larger
+deploys. The archive is extracted only after it arrived completely, so an
+interrupted transfer never leaves a partial set of files. A failed upload is
+retried up to three times, and every SSH/SCP call uses `ConnectTimeout` and
+keepalives, so a stalled connection fails instead of hanging.
 
 ## Remote Requirements
 
