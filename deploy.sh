@@ -35,13 +35,16 @@ fi
 # ── SSH/SCP helper ───────────────────────────────────────────
 # Usage: build_ssh_args; then use "${SSH_ARGS[@]}"
 #        build_scp_args; then use "${SCP_ARGS[@]}"
+# Fail instead of hanging forever when the server stops answering mid-transfer.
+SSH_TIMEOUT_OPTIONS=(-o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
+
 build_ssh_args() {
-    SSH_ARGS=(-p "$SERVER_PORT" -o "StrictHostKeyChecking=${SSH_HOST_KEY_POLICY:-accept-new}")
+    SSH_ARGS=(-p "$SERVER_PORT" -o "StrictHostKeyChecking=${SSH_HOST_KEY_POLICY:-accept-new}" "${SSH_TIMEOUT_OPTIONS[@]}")
     if [[ -n "$SSH_KEY" ]]; then SSH_ARGS+=(-i "$SSH_KEY"); fi
 }
 
 build_scp_args() {
-    SCP_ARGS=(-P "$SERVER_PORT" -o "StrictHostKeyChecking=${SSH_HOST_KEY_POLICY:-accept-new}")
+    SCP_ARGS=(-P "$SERVER_PORT" -o "StrictHostKeyChecking=${SSH_HOST_KEY_POLICY:-accept-new}" "${SSH_TIMEOUT_OPTIONS[@]}")
     if [[ -n "$SSH_KEY" ]]; then SCP_ARGS+=(-i "$SSH_KEY"); fi
 }
 
@@ -268,48 +271,77 @@ get_changed_files() {
     fi
 }
 
-# ── Function: upload a file or directory ────────────────────
-send_item() {
-    local item="$1"
-    local local_path="$SCRIPT_DIR/$item"
+# ── Upload: one archive over one connection ─────────────────
+# Sending file by file needs two SSH connections per file, which trips the
+# hosting's connection limits on bigger deploys (stalls, timeouts). All files go
+# into one archive instead: one SCP upload, then one SSH call extracts it, so the
+# server never sees a half-uploaded set of files.
+resolve_upload_files() {
+    local item local_path child relative_path
+    for item in "$@"; do
+        item="${item#./}"
+        item="${item//\\//}"
+        if is_excluded_path "$item"; then
+            echo "  [SKIP] Excluded path: $item" >&2
+            continue
+        fi
+        local_path="$SCRIPT_DIR/$item"
+        if [[ ! -e "$local_path" ]]; then
+            echo "  [SKIP] Not found: $item" >&2
+            continue
+        fi
+        if [[ -d "$local_path" ]]; then
+            while IFS= read -r -d '' child; do
+                relative_path="${child#"$SCRIPT_DIR/"}"
+                is_excluded_path "$relative_path" || printf '%s\n' "$relative_path"
+            done < <(find "$local_path" \
+                \( -type d \( -name .venv -o -name .uv -o -name __pycache__ \) -prune \) -o \
+                -type f -print0)
+        else
+            printf '%s\n' "$item"
+        fi
+    done | awk '!seen[$0]++'
+}
 
-    if is_excluded_path "$item"; then
-        echo "  [SKIP] Excluded path: $item"
-        return
-    fi
-
-    if [[ ! -e "$local_path" ]]; then
-        echo "  [SKIP] Not found: $item"
-        return
-    fi
-
-    if [[ -d "$local_path" ]]; then
-        # Upload directory contents individually so excluded directories are never passed to SCP.
-        local child relative_path
-        while IFS= read -r -d '' child; do
-            relative_path="${child#"$SCRIPT_DIR/"}"
-            send_item "$relative_path"
-        done < <(find "$local_path" \
-            \( -type d \( -name .venv -o -name .uv -o -name __pycache__ \) -prune \) -o \
-            -type f -print0)
-        return
-    fi
-
-    build_ssh_args
-    build_scp_args
-
-    printf "  -> %s" "$item"
-
-    # Ensure the remote directory exists before uploading the file.
-    local remote_dir
-    remote_dir="$REMOTE_APP_DIR/$(dirname "$item")"
-    ssh "${SSH_ARGS[@]}" "$SERVER_USER@$SERVER_HOST" "mkdir -p ${remote_dir@Q}" 2>/dev/null || true
-    if scp "${SCP_ARGS[@]}" "$local_path" "$SERVER_USER@$SERVER_HOST:$REMOTE_APP_DIR/$item" 2>&1; then
-        echo "  [OK]"
-    else
-        echo "  [ERROR]"
+upload_archive() {
+    local -a files=("$@")
+    local remote_name archive list attempt size_kb quoted_dir
+    remote_name=".deploy-upload-$(date +%s)-$$.tgz"
+    archive="$(mktemp)"
+    list="$(mktemp)"
+    printf '%s\n' "${files[@]}" > "$list"
+    if ! tar --format=ustar -czf "$archive" -C "$SCRIPT_DIR" -T "$list"; then
+        echo "  [ERROR] Could not create the upload archive (tar)."
+        rm -f "$archive" "$list"
         return 1
     fi
+    size_kb=$(( ($(wc -c < "$archive") + 1023) / 1024 ))
+
+    build_scp_args
+    for attempt in 1 2 3; do
+        printf "  -> %d files, one archive (%d KB), attempt %d/3" "${#files[@]}" "$size_kb" "$attempt"
+        if scp "${SCP_ARGS[@]}" "$archive" "$SERVER_USER@$SERVER_HOST:$remote_name"; then
+            echo "  [OK]"
+            break
+        fi
+        echo "  [ERROR]"
+        if [[ $attempt -eq 3 ]]; then
+            rm -f "$archive" "$list"
+            return 1
+        fi
+        sleep $((5 * attempt))
+    done
+    rm -f "$archive" "$list"
+
+    # Extract into the app directory and remove the uploaded archive (it sits in the remote home dir).
+    build_ssh_args
+    printf -v quoted_dir '%q' "$REMOTE_APP_DIR"
+    if ! ssh "${SSH_ARGS[@]}" "$SERVER_USER@$SERVER_HOST" \
+        "mkdir -p -- $quoted_dir && tar -xzf ~/$remote_name -C $quoted_dir; status=\$?; rm -f ~/$remote_name; exit \$status"; then
+        echo "  [ERROR] Extracting the archive on the server failed."
+        return 1
+    fi
+    printf '     %s\n' "${files[@]}"
 }
 
 # ── Interactive menu ─────────────────────────────────────────
@@ -480,9 +512,15 @@ fi
 # Upload
 echo ""
 echo "Uploading files..."
-for item in "${items_to_send[@]}"; do
-    send_item "$item"
-done
+mapfile -t files_to_upload < <(resolve_upload_files "${items_to_send[@]}")
+if [[ ${#files_to_upload[@]} -eq 0 ]]; then
+    echo "Nothing to upload after filtering protected and missing paths."
+    exit 1
+fi
+if ! upload_archive "${files_to_upload[@]}"; then
+    echo "Upload failed; dependency synchronization and restart were skipped."
+    exit 1
+fi
 
 # Always synchronize and validate the project environment before restart.
 # uv sync is exact and idempotent, and catches stale/broken binary extensions.
